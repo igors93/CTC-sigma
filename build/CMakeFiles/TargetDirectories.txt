@@ -1,9 +1,0 @@
-/home/igor/Documentos/C/CTC/CTC-Σ/build/CMakeFiles/ctc_sigma_static.dir
-/home/igor/Documentos/C/CTC/CTC-Σ/build/CMakeFiles/ctc_sigma_shared.dir
-/home/igor/Documentos/C/CTC/CTC-Σ/build/CMakeFiles/ctc_dump_constants.dir
-/home/igor/Documentos/C/CTC/CTC-Σ/build/CMakeFiles/edit_cache.dir
-/home/igor/Documentos/C/CTC/CTC-Σ/build/CMakeFiles/rebuild_cache.dir
-/home/igor/Documentos/C/CTC/CTC-Σ/build/CMakeFiles/list_install_components.dir
-/home/igor/Documentos/C/CTC/CTC-Σ/build/CMakeFiles/install.dir
-/home/igor/Documentos/C/CTC/CTC-Σ/build/CMakeFiles/install/local.dir
-/home/igor/Documentos/C/CTC/CTC-Σ/build/CMakeFiles/install/strip.dir

@@ -1,1 +1,0 @@
-/usr/bin/cc -O3 -DNDEBUG -Wl,--dependency-file=CMakeFiles/ctc_dump_constants.dir/link.d CMakeFiles/ctc_dump_constants.dir/tools/dump_constants.c.o -o ctc_dump_constants  libctc_sigma.a
