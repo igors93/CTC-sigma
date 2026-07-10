@@ -53,7 +53,23 @@ Implements `v_h = A_ENC_i(u + h·e_0)`, exact 32-bit rejection, sign extraction,
 
 ### `braid`
 
-Defines signed factor and normal-form representations. The exact `B_8` left Garside normalizer is isolated behind `ctc_braid_normalizer_fn`.
+Defines signed factor and normal-form representations and implements the exact
+left Garside normal form for `B_8` over permutation braids:
+
+- a simple element is stored as `map[start_position] = end_position`;
+- a negative factor is rewritten as `x^-1 = Delta^-1 * tau(complement(x))` and
+  the `Delta^-1` is pulled to the front, applying `tau` to earlier factors;
+- adjacent pairs are made left-weighted by transferring
+  `t = meet(complement(a), b)`, where the prefix-lattice meet is computed by
+  greedy extraction of common initial generators;
+- the local rewriting is iterated to a fixed point; `Delta` factors collect at
+  the front (absorbed into the infimum) and identity factors at the back
+  (dropped).
+
+The normalizer stays injectable through `ctc_braid_normalizer_fn` so that
+independent implementations can be swapped in for cross-validation. The test
+suite injects `test/python/garside_reference.py`, an independent atom-transfer
+implementation, and requires identical output.
 
 ### `fold`
 

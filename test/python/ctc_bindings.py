@@ -109,6 +109,14 @@ lib.ctc_lehmer_rank.restype = ctypes.c_int
 lib.ctc_lehmer_unrank.argtypes = [ctypes.c_uint32, ctypes.POINTER(ctypes.c_uint8)]
 lib.ctc_lehmer_unrank.restype = ctypes.c_int
 
+lib.ctc_braid_normalize_left.argtypes = [
+    ctypes.POINTER(SignedFactor),
+    ctypes.c_size_t,
+    ctypes.POINTER(BraidNormalForm),
+    ctypes.c_void_p,
+]
+lib.ctc_braid_normalize_left.restype = ctypes.c_int
+
 lib.ctc_encoder_generate_factors.argtypes = [
     ctypes.POINTER(ctypes.c_uint64),
     ctypes.c_uint32,
@@ -145,6 +153,8 @@ lib.ctc_sponge_free_encoded_message.restype = None
 
 lib.ctc_permutation_apply.argtypes = [ctypes.POINTER(ctypes.c_uint64)]
 lib.ctc_permutation_apply.restype = ctypes.c_int
+lib.ctc_permutation_inverse.argtypes = [ctypes.POINTER(ctypes.c_uint64)]
+lib.ctc_permutation_inverse.restype = ctypes.c_int
 lib.ctc_permutation_apply_with_normalizer.argtypes = [
     ctypes.POINTER(ctypes.c_uint64),
     NORMALIZER_CALLBACK,
@@ -175,6 +185,46 @@ lib.ctc_xof_with_normalizer.argtypes = [
     ctypes.c_size_t,
 ]
 lib.ctc_xof_with_normalizer.restype = ctypes.c_int
+
+lib.ctc_hash256.argtypes = [
+    ctypes.POINTER(ctypes.c_uint8),
+    ctypes.c_size_t,
+    ctypes.POINTER(ctypes.c_uint8),
+]
+lib.ctc_hash256.restype = ctypes.c_int
+lib.ctc_xof.argtypes = [
+    ctypes.POINTER(ctypes.c_uint8),
+    ctypes.c_size_t,
+    ctypes.POINTER(ctypes.c_uint8),
+    ctypes.c_size_t,
+]
+lib.ctc_xof.restype = ctypes.c_int
+
+
+def hash256(message: bytes) -> bytes:
+    source = (
+        (ctypes.c_uint8 * len(message)).from_buffer_copy(message)
+        if message
+        else None
+    )
+    digest = (ctypes.c_uint8 * 32)()
+    status = lib.ctc_hash256(source, len(message), digest)
+    if status != CTC_STATUS_OK:
+        raise RuntimeError(f"ctc_hash256 failed with status {status}")
+    return bytes(digest)
+
+
+def xof(message: bytes, output_length: int) -> bytes:
+    source = (
+        (ctypes.c_uint8 * len(message)).from_buffer_copy(message)
+        if message
+        else None
+    )
+    output = (ctypes.c_uint8 * output_length)()
+    status = lib.ctc_xof(source, len(message), output, output_length)
+    if status != CTC_STATUS_OK:
+        raise RuntimeError(f"ctc_xof failed with status {status}")
+    return bytes(output)
 
 
 def u64_array(values: list[int] | tuple[int, ...], length: int | None = None):

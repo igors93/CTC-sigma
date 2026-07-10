@@ -1,0 +1,21 @@
+# Build output
+build/
+*.o
+*.a
+*.so
+*.so.*
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.venv/
+
+# Tooling caches
+.cache/
+
+# Editors
+.vscode/
+.idea/
+*.swp
