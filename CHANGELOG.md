@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — continuous integration (2026-07-10)
+
+- GitHub Actions workflow (`.github/workflows/ci.yml`) with two jobs:
+  - **Build and test** on GCC (warnings promoted to errors) and Clang:
+    Release build, constant-dump smoke test, full pytest suite, and a check
+    that `scripts/generate_kat.py` reproduces the frozen KAT vectors bit for
+    bit;
+  - **AddressSanitizer / UBSan**: Debug build with
+    `-fsanitize=address,undefined`, running the full suite with `libasan`
+    preloaded into the Python interpreter.
+
 ### Changed — README.md rewritten (2026-07-10)
 
 The README was rewritten from scratch as a professional, English-language

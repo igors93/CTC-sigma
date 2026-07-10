@@ -1,0 +1,94 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    name: Build and test (${{ matrix.compiler }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # The tree is kept warning-free under GCC's strict flag set, so GCC
+          # promotes warnings to errors. Clang is built without -Werror to
+          # surface (but not fail on) any divergent diagnostics.
+          - compiler: gcc
+            extra_c_flags: -Werror
+          - compiler: clang
+            extra_c_flags: ""
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install test dependencies
+        run: python -m pip install pytest
+
+      - name: Configure
+        run: >
+          cmake -S . -B build
+          -DCMAKE_BUILD_TYPE=Release
+          -DCMAKE_C_COMPILER=${{ matrix.compiler }}
+          -DCMAKE_C_FLAGS="${{ matrix.extra_c_flags }}"
+
+      - name: Build
+        run: cmake --build build --parallel
+
+      - name: Smoke-test the constant dump tool
+        run: ./build/ctc_dump_constants
+
+      - name: Run the Python test suite
+        run: python -m pytest -ra
+
+      - name: Verify frozen KAT vectors are reproducible
+        run: |
+          python scripts/generate_kat.py
+          git diff --exit-code test/vectors/
+
+  sanitizers:
+    name: AddressSanitizer / UBSan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install test dependencies
+        run: python -m pip install pytest
+
+      - name: Configure with sanitizers
+        run: >
+          cmake -S . -B build
+          -DCMAKE_BUILD_TYPE=Debug
+          -DCMAKE_C_COMPILER=gcc
+          -DCMAKE_C_FLAGS="-fsanitize=address,undefined -fno-sanitize-recover=all"
+
+      - name: Build
+        run: cmake --build build --parallel
+
+      - name: Run the Python test suite under ASan/UBSan
+        # The instrumented shared library is loaded into an uninstrumented
+        # Python interpreter, so libasan must be preloaded. Leak detection is
+        # disabled because CPython itself reports benign leaks at exit.
+        env:
+          ASAN_OPTIONS: detect_leaks=0
+          UBSAN_OPTIONS: print_stacktrace=1
+        run: |
+          export LD_PRELOAD="$(gcc -print-file-name=libasan.so)"
+          python -m pytest -ra

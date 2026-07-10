@@ -1,4 +1,4 @@
-# CTC-Σ (CTC-Sigma) v0.1
+# CTC-Σ (CTC-Sigma)
 
 **An experimental hash function and XOF candidate built from a Feistel permutation over a prime field and the left Garside normal form of the braid group B₈.**
 
@@ -280,6 +280,7 @@ full hash pipeline.
 
 ```text
 .
+├── .github/workflows/        Continuous integration (build, tests, sanitizers)
 ├── cmake/                    Reusable CMake configuration
 ├── docs/                     Architecture, status, and spec traceability
 ├── include/ctc_sigma/        Public C API (one header per module)
