@@ -5,6 +5,7 @@
 #include <stdint.h>
 
 #include "ctc_sigma/braid.h"
+#include "ctc_sigma/parameters.h"
 #include "ctc_sigma/status.h"
 
 #ifdef __cplusplus
@@ -33,6 +34,16 @@ ctc_status_t ctc_sponge_encode_message(
 );
 
 void ctc_sponge_free_encoded_message(uint8_t *encoded_message);
+
+/*
+ * Evaluate the exact 40-bit squeeze acceptance predicate for eight canonical
+ * rate lanes. This helper is also used internally by the squeeze loop, making
+ * threshold boundary tests exercise the production branch directly.
+ */
+ctc_status_t ctc_sponge_rate_block_is_acceptable(
+    const uint64_t rate_lanes[CTC_RATE_LANES],
+    int *accepted_out
+);
 
 ctc_status_t ctc_hash256(
     const uint8_t *message,

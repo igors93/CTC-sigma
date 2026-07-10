@@ -1,8 +1,20 @@
 # CTC-Σ (CTC-Sigma)
 
-**An experimental hash function and XOF candidate built from a Feistel permutation over a prime field and the left Garside normal form of the braid group B₈.**
+<div align="center">
+
+**An experimental hash function and XOF candidate built from a Feistel permutation<br>over a prime field and the left Garside normal form of the braid group B₈.**
 
 Reference implementation in C11 with a Python validation suite.
+
+[![CI](https://github.com/igors93/CTC-Sigma/actions/workflows/ci.yml/badge.svg)](https://github.com/igors93/CTC-Sigma/actions/workflows/ci.yml)
+![Language](https://img.shields.io/badge/C-C11-blue.svg)
+![Build](https://img.shields.io/badge/build-CMake-064F8C.svg?logo=cmake&logoColor=white)
+![Tests](https://img.shields.io/badge/tests-pytest-0A9EDC.svg?logo=pytest&logoColor=white)
+![Spec](https://img.shields.io/badge/spec-v0.1-lightgrey.svg)
+![Status](https://img.shields.io/badge/status-experimental-orange.svg)
+![Security](https://img.shields.io/badge/security-not%20proven-red.svg)
+
+</div>
 
 > ⚠️ **Experimental status.** CTC-Σ is a research candidate under active
 > cryptanalysis. It must **not** be used to protect real data. No security
@@ -82,20 +94,19 @@ security minima.
 
 ## How the construction works
 
-```text
-message bytes
-     │
-     ▼
-domain byte, length, injective padding          (§9.2 of the spec)
-     │
-     ▼
-absorb: 8 little-endian 40-bit words per block ──► PΣ after each block
-     │
-     ▼
-squeeze with rejection sampling (no modular bias)
-     │
-     ▼
-CTC-Σ-256 digest / CTC-Σ-XOF stream
+```mermaid
+flowchart TD
+    MSG["Message bytes"]
+    PAD["Domain byte, length,<br>injective padding"]
+    ABS["Absorption<br>8 little-endian 40-bit words per block"]
+    PERM["Internal permutation PΣ over F_q¹⁶<br>12 Feistel rounds, applied after each block"]
+    SQZ["Squeeze<br>rejection sampling — no modular bias"]
+    HASH["CTC-Σ-256 digest<br>256 bits"]
+    XOF["CTC-Σ-XOF stream<br>arbitrary length"]
+
+    MSG --> PAD --> ABS --> PERM --> SQZ
+    SQZ --> HASH
+    SQZ --> XOF
 ```
 
 ### Sponge mode
@@ -137,30 +148,25 @@ sponge argument.
 Each round's branch function maps eight lanes to eight lanes through six
 stages:
 
-```text
-R ∈ F_q⁸
-  │
-  ▼
-A_PRE      arithmetic pre-mixing (4 subrounds)             u = A_PRE_i(R)
-  │
-  ▼
-Expander   deterministic blocks v_h = A_ENC_i(u + h·e₀),
-           exact 32-bit rejection sampling                 (no modular bias)
-  │
-  ▼
-Factors    32 signed simple factors of B₈:
-           index ∈ {1, …, 40319} by Lehmer code, sign ∈ {+1, −1}
-  │
-  ▼
-Garside    left normal form  NF(W) = Δᵖ · x₁ ⋯ x_m
-           partition into Drop (prefix) and Keep (last 16 factors)
-  │
-  ▼
-FOLD_NF    tagged tokenization of p, m, cut position, and every factor;
-           non-linear 8-lane accumulator with A_FOLD between groups
-  │
-  ▼
-A_POST     F_i(R) = A_POST_i(u + h + C_i)                  (6 subrounds)
+```mermaid
+flowchart TD
+    R["R ∈ F_q⁸"]
+    APRE["A_PRE<br>arithmetic pre-mixing, 4 subrounds<br>u = A_PRE_i(R)"]
+    EXP["Expander<br>deterministic blocks v_h = A_ENC_i(u + h·e₀)<br>exact 32-bit rejection sampling"]
+    FAC["32 signed simple factors of B₈<br>index ∈ {1, …, 40319} by Lehmer code, sign ∈ {+1, −1}"]
+    GAR["Left Garside normal form<br>NF(W) = Δᵖ · x₁ ⋯ x_m"]
+    DROP["Drop<br>infimum p, length m,<br>cut position, prefix factors"]
+    KEEP["Keep<br>window of the last<br>16 factors"]
+    FOLD["FOLD_NF<br>tagged tokenization + non-linear 8-lane accumulator<br>A_FOLD between token groups"]
+    POST["A_POST — 6 subrounds<br>F_i(R) = A_POST_i(u + h + C_i)"]
+
+    R --> APRE --> EXP --> FAC --> GAR
+    GAR --> DROP
+    GAR --> KEEP
+    DROP --> FOLD
+    KEEP --> FOLD
+    FOLD --> POST
+    APRE -. "u" .-> POST
 ```
 
 Nothing from the normal form is silently discarded: the infimum, canonical
@@ -211,7 +217,7 @@ tests work (see [Testing](#testing)).
 Every constant is derived reproducibly from SHAKE256:
 
 ```text
-Seed(label, a, b)  = "CTC-SIGMA-v0.1|" ‖ label ‖ LE32(a) ‖ LE32(b)
+Seed(label, a, b)  = "CTC-SIGMA|" ‖ label ‖ LE32(a) ‖ LE32(b)
 Const(label, a, b) = IntegerLE(SHAKE256(Seed, 16 bytes)) mod q
 ```
 
@@ -244,11 +250,30 @@ level. These are open questions in the specification's research plan.
 
 One-way dependency structure — lower modules never depend on higher ones:
 
-```text
-field ───────────────┐
-keccak → constants ──┼──► arith ──► encoder ──┐
-lehmer → braid ──────┼────────────────────────┼──► branch ──► permutation ──► sponge
-                     └────────► fold ◄────────┘
+```mermaid
+flowchart TD
+    SPONGE["sponge<br>padding · absorb · squeeze · Hash256/XOF"]
+    PERM["permutation<br>12-round Feistel PΣ and inverse"]
+    BRANCH["branch<br>branch function F_i"]
+    ENCODER["encoder<br>expander · factor sampling"]
+    BRAID["braid<br>left Garside normal form"]
+    FOLD["fold<br>tokenization · FOLD_NF"]
+    ARITH["arith<br>S-boxes · Cauchy MDS · ARITH"]
+    LEHMER["lehmer<br>S₈ rank/unrank"]
+    CONST["constants<br>SHAKE256 derivation"]
+    KECCAK["keccak<br>Keccak-f[1600]"]
+    FIELD["field<br>F_q arithmetic"]
+
+    SPONGE --> PERM --> BRANCH
+    BRANCH --> ENCODER
+    BRANCH --> BRAID
+    BRANCH --> FOLD
+    ENCODER --> ARITH
+    FOLD --> ARITH
+    BRAID --> LEHMER
+    ARITH --> CONST
+    ARITH --> FIELD
+    CONST --> KECCAK
 ```
 
 | Module | Responsibility |

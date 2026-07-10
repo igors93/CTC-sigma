@@ -18,6 +18,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     `-fsanitize=address,undefined`, running the full suite with `libasan`
     preloaded into the Python interpreter.
 
+### Changed — README.md visual header and diagrams (2026-07-10)
+
+- Added a centered header with status badges (CI, language, build system,
+  test framework, specification version, experimental status, security
+  disclaimer) linked to the GitHub Actions workflow.
+- Replaced the three ASCII diagrams with GitHub-rendered Mermaid flowcharts:
+  the sponge data flow, the six-stage branch function `F_i` pipeline (now
+  showing the Drop/Keep split and the `u` feed-forward into A_POST), and the
+  module dependency architecture.
+
 ### Changed — README.md rewritten (2026-07-10)
 
 The README was rewritten from scratch as a professional, English-language

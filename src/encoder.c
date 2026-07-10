@@ -8,11 +8,10 @@
 #include "ctc_sigma/field.h"
 #include "ctc_sigma/parameters.h"
 
-ctc_status_t ctc_encoder_generate_factors(
-    const uint64_t mixed_input[8],
-    uint32_t round_index,
-    ctc_signed_factor_t factors_out[CTC_FACTORS_PER_BRANCH],
-    size_t *generated_block_count_out
+ctc_status_t ctc_encoder_decode_candidate(
+    uint64_t lane_value,
+    ctc_signed_factor_t *factor_out,
+    ctc_encoder_candidate_result_t *result_out
 ) {
     const uint64_t two_to_32 = UINT64_C(1) << 32U;
     const uint64_t threshold_32 =
@@ -21,6 +20,44 @@ ctc_status_t ctc_encoder_generate_factors(
     const uint64_t simple_threshold =
         (two_to_31 / CTC_NON_IDENTITY_FACTOR_COUNT)
         * CTC_NON_IDENTITY_FACTOR_COUNT;
+    uint64_t word;
+    uint64_t factor_value;
+
+    if (factor_out == NULL || result_out == NULL) {
+        return CTC_STATUS_INVALID_ARGUMENT;
+    }
+    if (lane_value >= CTC_FIELD_MODULUS) {
+        return CTC_STATUS_OUT_OF_RANGE;
+    }
+
+    memset(factor_out, 0, sizeof(*factor_out));
+    if (lane_value >= threshold_32) {
+        *result_out = CTC_ENCODER_CANDIDATE_REJECT_FIELD_WORD;
+        return CTC_STATUS_OK;
+    }
+
+    word = lane_value & UINT64_C(0xFFFFFFFF);
+    factor_value = word & UINT64_C(0x7FFFFFFF);
+    if (factor_value >= simple_threshold) {
+        *result_out = CTC_ENCODER_CANDIDATE_REJECT_SIMPLE_INDEX;
+        return CTC_STATUS_OK;
+    }
+
+    factor_out->sign =
+        (word & (UINT64_C(1) << 31U)) == 0U ? INT8_C(1) : INT8_C(-1);
+    factor_out->simple_index = (uint16_t)(
+        1U + (factor_value % CTC_NON_IDENTITY_FACTOR_COUNT)
+    );
+    *result_out = CTC_ENCODER_CANDIDATE_ACCEPTED;
+    return CTC_STATUS_OK;
+}
+
+ctc_status_t ctc_encoder_generate_factors(
+    const uint64_t mixed_input[8],
+    uint32_t round_index,
+    ctc_signed_factor_t factors_out[CTC_FACTORS_PER_BRANCH],
+    size_t *generated_block_count_out
+) {
     size_t generated = 0U;
 
     if (mixed_input == NULL || factors_out == NULL) {
@@ -48,23 +85,22 @@ ctc_status_t ctc_encoder_generate_factors(
         for (uint32_t lane = 0U;
              lane < CTC_BRANCH_LANES && generated < CTC_FACTORS_PER_BRANCH;
              ++lane) {
-            uint64_t word;
-            uint64_t factor_value;
+            ctc_signed_factor_t candidate;
+            ctc_encoder_candidate_result_t candidate_result;
 
-            if (block[lane] >= threshold_32) {
-                continue;
-            }
-            word = block[lane] & UINT64_C(0xFFFFFFFF);
-            factor_value = word & UINT64_C(0x7FFFFFFF);
-            if (factor_value >= simple_threshold) {
-                continue;
-            }
-
-            factors_out[generated].sign =
-                (word & (UINT64_C(1) << 31U)) == 0U ? INT8_C(1) : INT8_C(-1);
-            factors_out[generated].simple_index = (uint16_t)(
-                1U + (factor_value % CTC_NON_IDENTITY_FACTOR_COUNT)
+            status = ctc_encoder_decode_candidate(
+                block[lane],
+                &candidate,
+                &candidate_result
             );
+            if (status != CTC_STATUS_OK) {
+                return status;
+            }
+            if (candidate_result != CTC_ENCODER_CANDIDATE_ACCEPTED) {
+                continue;
+            }
+
+            factors_out[generated] = candidate;
             ++generated;
         }
 

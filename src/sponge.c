@@ -102,6 +102,30 @@ void ctc_sponge_free_encoded_message(uint8_t *encoded_message) {
     free(encoded_message);
 }
 
+ctc_status_t ctc_sponge_rate_block_is_acceptable(
+    const uint64_t rate_lanes[CTC_RATE_LANES],
+    int *accepted_out
+) {
+    const uint64_t two_to_40 = UINT64_C(1) << 40U;
+    const uint64_t threshold_40 =
+        (CTC_FIELD_MODULUS / two_to_40) * two_to_40;
+
+    if (rate_lanes == NULL || accepted_out == NULL) {
+        return CTC_STATUS_INVALID_ARGUMENT;
+    }
+
+    *accepted_out = 1;
+    for (uint32_t lane = 0U; lane < CTC_RATE_LANES; ++lane) {
+        if (rate_lanes[lane] >= CTC_FIELD_MODULUS) {
+            return CTC_STATUS_OUT_OF_RANGE;
+        }
+        if (rate_lanes[lane] >= threshold_40) {
+            *accepted_out = 0;
+        }
+    }
+    return CTC_STATUS_OK;
+}
+
 static ctc_status_t ctc_sponge_absorb(
     ctc_sponge_t *sponge,
     const uint8_t *encoded_message,
@@ -142,8 +166,6 @@ static ctc_status_t ctc_sponge_squeeze(
     size_t output_length
 ) {
     const uint64_t two_to_40 = UINT64_C(1) << 40U;
-    const uint64_t threshold_40 =
-        (CTC_FIELD_MODULUS / two_to_40) * two_to_40;
     size_t produced = 0U;
 
     if (sponge == NULL
@@ -157,15 +179,15 @@ static ctc_status_t ctc_sponge_squeeze(
         int accepted = 0;
 
         while (accepted == 0 && rejection_count < CTC_SQUEEZE_MAX_REJECTIONS) {
-            accepted = 1;
-            for (uint32_t lane = 0U; lane < CTC_RATE_LANES; ++lane) {
-                if (sponge->state[lane] >= threshold_40) {
-                    accepted = 0;
-                    break;
-                }
+            ctc_status_t status = ctc_sponge_rate_block_is_acceptable(
+                sponge->state,
+                &accepted
+            );
+            if (status != CTC_STATUS_OK) {
+                return status;
             }
             if (accepted == 0) {
-                const ctc_status_t status = ctc_permutation_apply_with_normalizer(
+                status = ctc_permutation_apply_with_normalizer(
                     sponge->state,
                     normalizer,
                     normalizer_context
