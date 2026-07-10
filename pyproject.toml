@@ -1,0 +1,15 @@
+[project]
+name = "ctc-sigma-tests"
+version = "0.1.0"
+description = "Python validation suite for the CTC-Sigma C core"
+requires-python = ">=3.10"
+dependencies = [
+    "pytest>=8.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["test/python"]
+addopts = "-ra"
+markers = [
+    "slow: computationally expensive integration tests",
+]
