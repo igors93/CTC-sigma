@@ -113,9 +113,11 @@ All studies must follow these principles:
 | Phase 0 overall | Correctness and reproducibility baseline | INCOMPLETE | Functionally successful, but sanitizer execution remains pending. |
 | Phase 1 | Statistical behavior and diffusion | PASS | General behavior was strong; the isolated Hash256 bit-159 observation was not reproduced by the confirmatory study. |
 | Phase 1B | Hash256 anomaly confirmation | PASS | Across 20,000 paired perturbations and 10 seeds, bit 159 showed no significant or consistent deviation from 50%. |
-| Phase 2A | Algebraic and structural baseline | REVIEW / INCOMPLETE | Reduced-field differential structure and two underpowered structural observations remain open; production KAT and solver confirmation are pending. |
+| Phase 2A | Algebraic and structural baseline | REVIEW / INCOMPLETE | Reduced-field differential structure, S-box symmetry, braid contribution, production KAT, and solver confirmation remain open. The original encoder observation is superseded by Phases 2C and 2D. |
 | Phase 2B | Production differential diffusion and simple symmetries | PASS | An eight-hour run completed 332,241 paired cases; all tested local differences reached near-50% diffusion by round 3 or earlier, and no tested global transformation commuted with the final permutation. |
-| Phase 2 overall | Differential, structural, and algebraic cryptanalysis | REVIEW / INCOMPLETE | Phase 2B strengthened the production diffusion evidence, but the open S-box, encoder, braid-contribution, and algebraic-solver questions are not resolved. |
+| Phase 2C | Encoder related-input dependence confirmation | REVIEW | A 160,000-case study confirmed 64 lane-aggregate correlations only for the add-one family. No normal-form equality or FOLD output-bit bias was confirmed. |
+| Phase 2D | Encoder localization and production-path propagation | REVIEW; propagation PASS | The direct effect was localized to source lane 0. Independent analysis confirmed an exact input/counter block-shift identity. An ordinary add-one perturbation before `A_PRE` produced no confirmed downstream effect in the tested path. |
+| Phase 2 overall | Differential, structural, and algebraic cryptanalysis | REVIEW / INCOMPLETE | Strong diffusion evidence remains intact, but the confirmed encoder input/counter aliasing, S-box questions, braid contribution, and algebraic-solver work are unresolved. |
 | Phase 3 | Performance analysis | NOT STARTED | Preliminary measurements indicate that the reference implementation is slow. |
 | Phase 4 | Comparison with other algorithms | NOT STARTED | Pending stable benchmark methodology. |
 | Phase 5 | Implementation security | PARTIALLY STARTED | Static CI exists; dedicated fuzzing and successful sanitizer runs remain pending. |
@@ -1586,7 +1588,7 @@ The production-permutation KAT was also disabled. Therefore:
 - No tested linear or quadratic invariant was found.
 - No tested structured subspace was preserved.
 - No simple Mersenne rotation, scaling, or negation relation was found.
-- The encoder changed all 32 factors under the tested $u+e_0$ perturbation.
+- In the small Phase 2A same-position comparison, all 32 factor positions changed under the tested $u+e_0$ perturbation. Phases 2C and 2D later showed that this does not imply factor-stream independence: for source lane 0, 24 factors can be shared exactly after an eight-position shift.
 - No braid-relation, projection, or sampled normal-form collision failure occurred.
 - The arithmetic/Feistel construction reached near-ideal avalanche by round 3 without braids.
 - A machine-readable polynomial model was successfully exported.
@@ -1599,8 +1601,8 @@ The production-permutation KAT was also disabled. Therefore:
 2. **Differential uniformity above the sampled random baseline**  
    Uniformities 14 and 12 were observed in $\mathbb F_{1279}$, versus a sampled random maximum of 10.
 
-3. **Encoder related-position sign correlation**  
-   A maximum absolute correlation of 0.410720 was observed, but the sample size and multiple comparisons prevent a reliable conclusion.
+3. **Encoder related-input correlation — historical precursor, superseded**  
+   A maximum absolute correlation of 0.410720 was observed in the small Phase 2A sample. Phase 2C later confirmed a weaker but highly reproducible lane-aggregate add-one dependence. Phase 2D then localized the effect to source lane 0 and identified the exact input/counter block-shift identity described in Sections 10 and 11.
 
 4. **Near-equivalent no-braid avalanche**  
    The no-braid variant had nearly the same two-round mean avalanche as the full branch in four samples.
@@ -1624,7 +1626,7 @@ Phase 2A: REVIEW
 Scope completion: INCOMPLETE
 ```
 
-The `REVIEW` result is caused by the differential spectrum and the two unconfirmed structural observations. The scope remains incomplete because the production KAT and Gröbner experiments were skipped and the standard profile used reduced models and small samples for several experiments.
+The original `REVIEW` result was caused by the differential spectrum and two then-unconfirmed structural observations. The encoder observation is no longer merely underpowered: it is superseded by the confirmed Phase 2C and Phase 2D findings. The scope remains incomplete because the production KAT and Gröbner experiments were skipped and the standard profile used reduced models and small samples for several experiments.
 
 ---
 
@@ -2092,17 +2094,643 @@ F2A-002 — Reduced-field differential uniformity 14/12:
 OPEN
 
 F2A-003 — Encoder related-input correlation:
-OPEN
+SUPERSEDED BY F2C-001 AND F2D-001
 
 F2A-004 — Measurable cryptographic contribution of the braid layer:
 OPEN
+
+F2C-001 — Add-one raw-encoder lane-aggregate dependence:
+CONFIRMED
+
+F2D-001 — Encoder lane-0 input/block-counter aliasing:
+CONFIRMED; COMPLETE-CONSTRUCTION IMPACT UNKNOWN
+
+F2D-002 — Ordinary pre-A_PRE add-one propagation:
+NOT OBSERVED WITHIN THE TESTED PRODUCTION PATH
 ```
 
-The next confirmatory work should target these findings directly rather than repeat ordinary avalanche testing.
+The next confirmatory work should prioritize the exact encoder relation and its chosen-state propagation rather than repeat ordinary avalanche testing.
 
 ---
 
-# 10. Preliminary performance observation
+# 10. Phase 2C — Encoder related-input dependence confirmation
+
+## 10.1 Objective
+
+Phase 2C was designed to resolve the underpowered encoder-correlation observation from Phase 2A.
+
+Its primary question was:
+
+> Does the production encoder preserve reproducible dependence between predefined related inputs, and does any detected relation survive Garside normalization and `FOLD` when compared with independent controls?
+
+The study tested four related-input families:
+
+- add one to one lane;
+- add a power of two to one lane;
+- add a balanced two-lane delta;
+- negate one lane.
+
+The tested round indices were `0`, `3`, `7`, and `11`.
+
+---
+
+## 10.2 Predeclared confirmation criteria
+
+An encoder correlation was classified as confirmed only when all of the following conditions held:
+
+```text
+Benjamini-Hochberg q-value:                 < 0.001
+absolute related correlation:               >= 0.05
+absolute excess over independent control:   >= 0.03
+consistent direction:                       at least 8 of 10 seed groups
+```
+
+The study separately corrected:
+
+- encoder position and lane correlation families;
+- normal-form comparisons;
+- `FOLD` output-bit tests.
+
+This design was intended to distinguish reproducible related-input structure from ordinary finite-sample noise.
+
+---
+
+## 10.3 Execution provenance and integrity
+
+```text
+Run ID:                 20260711T122146Z
+Profile:                standard
+Started:                2026-07-11T12:21:46Z
+Finished:               2026-07-11T12:57:23Z
+Duration:               2134.861 seconds
+Completed cases:        160,000 / 160,000
+Seed groups:            10
+Round indices:          0, 3, 7, 11
+Transforms:             4
+Cases per round/family: 10,000
+Master seed:            317952932156252027433539
+```
+
+Each case evaluated a base input, a related input, and an independent control through the encoder, Garside normalization, and `FOLD`. The run therefore represented approximately 480,000 complete encoder/normalization/FOLD evaluations.
+
+Implementation provenance:
+
+```text
+Core commit:
+0f514333610ce74bace424305c586320e9775b52
+
+Configuration SHA-256:
+2f29e16bd27c4ab47af5500778c060e8f23eac97fc4885e7ec701b2116ea1bd8
+
+Production library SHA-256:
+18080dc792a85a0cde06eaa8f91b34837657c691a126746f86f402511ee4253f
+
+Result ZIP SHA-256:
+61f33d9c5ff5c517a426279b0b7314ca8159ec2b5cf1349b39df8b5c16591ec3
+```
+
+Environment:
+
+```text
+CPU:       AMD Athlon 3000G with Radeon Vega Graphics
+Platform:  Linux x86_64
+Python:    CPython 3.14.6
+Git tree:  clean
+```
+
+Integrity results:
+
+```text
+Manifest entries valid:  16 / 16
+Snapshots valid:          2 / 2
+Failures:                 0
+Warnings:                 0
+Checkpoints decoded:      A and B
+```
+
+---
+
+## 10.4 Confirmed raw-encoder dependence
+
+The study executed:
+
+```text
+Encoder correlation tests:       3,072
+Confirmed encoder correlations:  64
+```
+
+All 64 confirmed findings belonged exclusively to:
+
+```text
+transform = add_one_lane
+```
+
+No confirmed encoder correlation was found for:
+
+- `add_power_of_two_lane`;
+- `balanced_two_lane_delta`;
+- `negate_one_lane`.
+
+The confirmed metrics were only the lane-aggregate metrics:
+
+```text
+lane_sign
+lane_rank
+```
+
+No individual `position_sign` or `position_rank` comparison satisfied the complete confirmation rule.
+
+The confirmed matrix indices were:
+
+```text
+0, 9, 18, 27, 36, 45, 54, 63
+```
+
+These are the diagonal cells of an $8\times8$ lane matrix. At the Phase 2C level, this indicated that aggregating the four factor contributions associated with the same lane retained a small related-input dependence.
+
+Across the 64 confirmed findings:
+
+```text
+related correlation range:        0.073122 to 0.121647
+mean related correlation:         0.093101
+excess-over-control range:        0.065306 to 0.113627
+mean excess over control:         0.087007
+10/10 consistent seed groups:     57 findings
+9/10 consistent seed groups:       7 findings
+```
+
+The effect occurred at every tested round index.
+
+### Relation to the Phase 2A observation
+
+Phase 2A had observed a maximum correlation of approximately `0.410720` with only 32 samples.
+
+Phase 2C established that:
+
+- the original magnitude was substantially overestimated by the small sample;
+- the underlying phenomenon was nevertheless real;
+- the reproducible aggregate effect was closer to approximately `0.07`–`0.12`;
+- the effect was specific to the add-one family within this experiment.
+
+---
+
+## 10.5 Factor sensitivity, normal form, and FOLD
+
+Despite the aggregate correlation, same-position factor sensitivity remained high:
+
+```text
+mean changed factors:                 31.9993 to 31.9999 of 32
+all 32 same-position factors changed: 99.93% to 99.99%
+exact encoder words equal:            0
+```
+
+This same-position result must not be interpreted as proof that the two factor streams share no factors. Phase 2D later showed that an eight-position shift exposes exact factor sharing for source lane 0.
+
+After Garside normalization:
+
+```text
+exact normal forms equal:             0
+positional similarity range:          0.0001840 to 0.0002964
+```
+
+No related-versus-control normal-form effect met the predeclared confirmation criteria.
+
+After `FOLD`:
+
+```text
+exact FOLD outputs equal:             0
+mean Hamming fraction range:          0.499354 to 0.500427
+all eight output lanes changed:       100% of cases
+FOLD output-bit tests:                7,808
+confirmed FOLD bit effects:           0
+```
+
+Encoder generation required:
+
+```text
+4 blocks: 159,969 related cases
+5 blocks:      31 related cases
+```
+
+No rejection anomaly or output equality was observed.
+
+---
+
+## 10.6 Interpretation and limitation
+
+Phase 2C confirmed a real raw-encoder relation, but did not establish a practical attack.
+
+It demonstrated:
+
+> The add-one input family creates a small but highly reproducible dependence in lane-aggregate sign and rank statistics at the raw encoder output.
+
+It did not demonstrate:
+
+- prediction of individual factors;
+- an exact factor-stream relation by itself;
+- equal Garside normal forms;
+- a detectable `FOLD` output-bit bias;
+- a branch, permutation, Hash256, or XOF distinguisher;
+- a collision or preimage attack.
+
+The automatic study verdict was `REVIEW` because a predeclared correlation condition was confirmed.
+
+---
+
+## 10.7 Phase 2C conclusion
+
+```text
+Phase 2C:
+REVIEW
+```
+
+Finding disposition:
+
+```text
+F2C-001 — Add-one raw-encoder lane-aggregate dependence:
+CONFIRMED
+
+Persistence after Garside normalization:
+NOT OBSERVED BY THE TESTED METRICS
+
+Persistence after FOLD:
+NOT OBSERVED BY THE TESTED METRICS
+
+Complete-construction impact:
+UNKNOWN
+```
+
+Phase 2C converted the Phase 2A encoder observation from an underpowered suspicion into a confirmed, narrower research finding. It did not yet explain the cause. That localization was addressed by Phase 2D.
+
+---
+
+# 11. Phase 2D — Encoder localization and block-counter aliasing
+
+## 11.1 Objective
+
+Phase 2D was designed to answer three questions:
+
+1. Which source lane causes the confirmed add-one dependence?
+2. At which encoder stage or block does it appear?
+3. Does an ordinary add-one difference survive the complete production branch path?
+
+The study evaluated both:
+
+- a direct path, where one was added to the encoder mixed input;
+- a production path, where one was added to the branch input before `A_PRE`.
+
+The production path was:
+
+```text
+branch input
+    -> A_PRE
+    -> encoder
+    -> Garside normalization
+    -> FOLD
+    -> direct-path addition and BRANCH-C
+    -> A_POST
+    -> branch output
+```
+
+---
+
+## 11.2 Predeclared design and thresholds
+
+```text
+Seed groups:                 10
+Round indices:               0, 3, 7, 11
+Source lanes:                0 through 7
+Samples per source lane:     80 per seed and round
+Total cases:                 25,600
+```
+
+The corrected statistical families were:
+
+- direct aggregate replication;
+- direct internal-stage localization;
+- source-conditioned localization;
+- production encoder propagation;
+- production Hamming propagation;
+- final branch output bits.
+
+Important thresholds included:
+
+```text
+correlation q-value:                     < 0.001
+minimum absolute correlation:            >= 0.05
+minimum excess over control:             >= 0.03
+primary seed consistency:                >= 8 of 10
+source-localization seed consistency:    >= 6 of 10
+production Hamming q-value:              < 0.001
+minimum production Hamming difference:   >= 0.005
+branch-bit q-value:                      < 0.001
+minimum branch-bit effect:               >= 0.01
+trace mismatch limit:                    0
+```
+
+---
+
+## 11.3 Execution provenance and integrity
+
+```text
+Run ID:                 20260711T141231Z
+Profile:                standard
+Started:                2026-07-11T14:12:31Z
+Finished:               2026-07-11T14:23:37Z
+Duration:               664.914 seconds
+Completed cases:        25,600 / 25,600
+Master seed:            317952932156252027433540
+```
+
+Implementation provenance:
+
+```text
+Core commit:
+0f514333610ce74bace424305c586320e9775b52
+
+Configuration SHA-256:
+5c5f12b30347b151ec9b0934543ee73ffc21408fc0933a1ccf6dd0a2225cf983
+
+Production library SHA-256:
+18080dc792a85a0cde06eaa8f91b34837657c691a126746f86f402511ee4253f
+
+Result ZIP SHA-256:
+c4d47787c545366bcc5e654ce89f7a970514c936ebf02e9a9f9b7c4f7a716fea
+```
+
+Integrity and trace consistency:
+
+```text
+Manifest entries valid:  14 / 14
+Failures:                 0
+Warnings:                 0
+Checkpoints decoded:      A and B
+Encoder trace checks:     1,920
+Encoder mismatches:       0
+Branch trace checks:      960
+Branch mismatches:        0
+Git tree:                 clean
+```
+
+---
+
+## 11.4 Automatic statistical results
+
+The Phase 2C direct aggregate effect was reproduced:
+
+```text
+Direct aggregate tests:              64
+Direct aggregate confirmations:      64
+Mean confirmed correlation:          0.092795
+```
+
+The source-conditioned analysis was decisive:
+
+```text
+Source-conditioned tests:            512
+Supported source-conditioned results: 64
+Supported source lane:               lane 0 only
+Related correlation range:           0.720403 to 0.777528
+Mean related correlation:            0.750722
+Mean control correlation:           -0.003389
+Seed replication:                    10 / 10 for all 64
+Same source/output lane:              8 findings
+Different output lane:               56 findings
+```
+
+The fact that 56 findings used an output lane different from the source lane indicates a whole-block relation rather than a local output-lane effect.
+
+The same-index internal-stage family reported:
+
+```text
+Direct internal-stage tests:         448
+Confirmed same-index stage effects:  0
+```
+
+This result was initially interpreted by the automatic report as failing to identify a particular `A_ENC` subround. The post-run structural analysis below explains why the same-index comparison could not detect the actual relation.
+
+---
+
+## 11.5 Exact input/counter block-shift identity
+
+The production encoder constructs block `b` by copying the eight-lane mixed input, adding the block index to lane 0, and then applying `A_ENC`.
+
+Define:
+
+$$
+B_r(x,b)=A_{\mathrm{ENC},r}(x+b e_0),
+$$
+
+where $e_0$ denotes one in lane 0 and zero in every other lane.
+
+For the related input $x'=x+e_0$:
+
+$$
+\begin{aligned}
+B_r(x',b)
+&=A_{\mathrm{ENC},r}(x+e_0+b e_0)\\
+&=A_{\mathrm{ENC},r}(x+(b+1)e_0)\\
+&=B_r(x,b+1).
+\end{aligned}
+$$
+
+Therefore:
+
+> Adding one to input lane 0 is exactly equivalent, at the encoder block-transform level, to advancing the block counter by one.
+
+This is an algebraic identity created by the counter-injection rule. It is not a probabilistic effect and it is not caused by a particular S-box or MDS subround.
+
+### Why the same-index stage tests returned zero
+
+The stage-localization family compared:
+
+```text
+base block b
+against
+related block b
+```
+
+The exact identity instead relates:
+
+```text
+base block b + 1
+against
+related block b
+```
+
+Consequently, `0 / 448` same-index confirmations do not contradict the exact block-shift relation.
+
+---
+
+## 11.6 Exact shifted-factor evidence in the archived samples
+
+When the first four blocks each supply eight accepted candidates, the base factor word has the form:
+
+$$
+W(x)=C_0\Vert C_1\Vert C_2\Vert C_3,
+$$
+
+while the lane-0 add-one word has the form:
+
+$$
+W(x+e_0)=C_1\Vert C_2\Vert C_3\Vert C_4.
+$$
+
+Under that acceptance pattern, the two 32-factor words share 24 factors exactly, shifted by eight positions.
+
+The Phase 2D archive preserved one raw sample for every seed, round, and source-lane cell. There were 40 archived raw samples with source lane 0. Independent analysis of those samples found:
+
+```text
+related block 0 = base block 1:      40 / 40
+related block 1 = base block 2:      40 / 40
+related block 2 = base block 3:      40 / 40
+related factors 0..23 =
+base factors 8..31:                  40 / 40
+```
+
+Every comparison contained all 24 expected shared factors.
+
+This raw-sample result is consistent with the exact identity and explains the source-conditioned correlation near `0.75`: three of four eight-factor blocks are reused.
+
+It also explains the Phase 2C aggregate magnitude:
+
+$$
+0.75 / 8 \approx 0.09375,
+$$
+
+because Phase 2C distributed the lane-0 effect across eight possible source lanes.
+
+### Rejection limitation
+
+The block-transform identity holds independently of candidate acceptance. However, exact 24-factor word overlap assumes that the relevant blocks provide the expected eight accepted candidates. Rejections can move factor boundaries and must be included in any complete factor-stream theorem or attack analysis.
+
+---
+
+## 11.7 Ordinary production-path propagation result
+
+For the tested production family, one was added to a branch-input lane before `A_PRE`.
+
+Results:
+
+```text
+Production encoder correlation tests:   64
+Confirmed production correlations:       0
+Production Hamming tests:                44
+Confirmed production Hamming effects:    0
+Final branch output-bit tests:         1,952
+Confirmed final branch-bit effects:       0
+```
+
+Round-level mean Hamming fractions remained close to one half:
+
+| Round | `A_PRE` related/control | FOLD related/control | Branch related/control |
+|---:|---:|---:|---:|
+| 0 | 0.500224 / 0.499437 | 0.500623 / 0.499662 | 0.499824 / 0.500151 |
+| 3 | 0.500159 / 0.499788 | 0.500028 / 0.500200 | 0.499963 / 0.499706 |
+| 7 | 0.500328 / 0.500168 | 0.500238 / 0.500085 | 0.500384 / 0.500000 |
+| 11 | 0.500402 / 0.500287 | 0.500379 / 0.499338 | 0.499792 / 0.500292 |
+
+The automatic production-propagation verdict was:
+
+```text
+PASS
+```
+
+The correct interpretation is narrow:
+
+> An ordinary add-one difference applied before `A_PRE` did not produce a confirmed residual correlation, related-control Hamming advantage, or final branch-bit effect within the tested sample and thresholds.
+
+---
+
+## 11.8 Why the production PASS does not close F2D-001
+
+`A_PRE` is a public invertible permutation on the branch state. Therefore a chosen-input study can construct branch inputs whose post-`A_PRE` states differ by exactly $e_0$.
+
+For an arbitrary mixed state $M$:
+
+$$
+R=A_{\mathrm{PRE}}^{-1}(M),
+$$
+
+and:
+
+$$
+R'=A_{\mathrm{PRE}}^{-1}(M+e_0).
+$$
+
+Then:
+
+$$
+A_{\mathrm{PRE}}(R')=A_{\mathrm{PRE}}(R)+e_0.
+$$
+
+Such pairs force the exact encoder relation after `A_PRE`. Phase 2D did not test this chosen-post-`A_PRE` construction. It tested only an ordinary add-one perturbation before `A_PRE`.
+
+The next propagation study must therefore follow the exact relation through:
+
+1. Garside normalization;
+2. `FOLD`;
+3. branch output before and after `A_POST`;
+4. reduced-round Feistel propagation;
+5. the complete permutation where computationally feasible.
+
+---
+
+## 11.9 Security interpretation
+
+F2D-001 is a design-level structural relation, not an implementation error.
+
+It demonstrates:
+
+- data lane 0 and the block counter are injected through the same additive coordinate;
+- a lane-0 increment aliases a counter increment exactly at the block-transform level;
+- in the archived accepted-block examples, 24 of 32 factors were reused after an eight-position shift.
+
+It does not yet demonstrate:
+
+- equal Garside normal forms;
+- equal `FOLD` outputs;
+- a predictable complete branch output;
+- a differential trail through the Feistel permutation;
+- a hash or XOF collision;
+- a preimage advantage;
+- a practical distinguisher against the complete construction.
+
+Nevertheless, a cryptographic encoder should not normally allow input data and an internal block counter to represent the same exact transformation. The relation requires design review before any production claim or stable-parameter release.
+
+---
+
+## 11.10 Phase 2D conclusion
+
+```text
+Phase 2D overall:
+REVIEW
+
+Ordinary pre-A_PRE production propagation:
+PASS WITHIN THE TESTED FAMILY
+```
+
+Finding disposition:
+
+```text
+F2D-001 — Encoder lane-0 input/block-counter aliasing:
+CONFIRMED
+
+F2D-002 — Ordinary pre-A_PRE add-one propagation:
+NOT OBSERVED WITHIN THE TESTED SAMPLE AND THRESHOLDS
+
+Practical complete-construction attack:
+NOT DEMONSTRATED
+
+Encoder design action:
+REVIEW REQUIRED; LIKELY REDESIGN BEFORE PRODUCTION
+```
+
+The result does not justify replacing the complete CTC-Σ design immediately. It does justify freezing production claims and prioritizing exact chosen-state propagation before selecting a counter-injection redesign.
+
+---
+
+# 12. Preliminary performance observation
 
 Performance was not the primary target of Phases 0 or 1.
 
@@ -2139,11 +2767,11 @@ The current implementation prioritizes reference clarity and testability over op
 
 ---
 
-# 11. Current security interpretation
+# 13. Current security interpretation
 
 The evidence currently supports the following statement:
 
-> The evaluated CTC-Σ implementation is functionally coherent in the tested environment and exhibits strong observed diffusion and generally balanced statistical behavior. The isolated Hash256 bit-159 observation from the initial Phase 1 matrix was not reproduced by a pre-registered confirmatory study of 20,000 paired perturbations across ten seeds. The eight-hour Phase 2B production study completed 332,241 paired cases and found that all six tested local differential families reached near-50% mean diffusion by round three or earlier, while none of the six tested global transformations commuted exactly with the final permutation. No final output-bit effect survived the predeclared global multiple-testing correction, and no production trace mismatch was observed. The initial algebraic baseline nevertheless identified an exact local S-box symmetry, elevated reduced-field differential uniformity, an underpowered encoder-correlation observation, and an unresolved question about the measurable security contribution of the braid layer. No practical cryptographic attack has been demonstrated. These results are insufficient to claim cryptographic security or production readiness.
+> The evaluated CTC-Σ implementation is functionally coherent in the tested environment and exhibits strong observed diffusion and generally balanced final statistical behavior. The Phase 1B bit-159 anomaly was not reproduced. The eight-hour Phase 2B production study found rapid diffusion for the tested local families, no exact commutation for the tested global transformations, no corrected final bit effect, and no production trace mismatch. Phase 2C then confirmed a reproducible add-one dependence at the raw encoder lane-aggregate level. Phase 2D localized that dependence to source lane 0, and independent post-run analysis identified an exact identity between incrementing input lane 0 and advancing the encoder block counter. In 40 archived source-lane-0 samples, the related factor word shared 24 of 32 factors exactly after an eight-position shift. An ordinary add-one perturbation applied before `A_PRE` did not produce a confirmed downstream effect in the tested production path, but the stronger chosen-post-`A_PRE` relation has not yet been propagated. No practical cryptographic attack has been demonstrated. The encoder relation requires design review and likely redesign before production use or a stable security claim.
 
 The current evidence must be interpreted with the following qualifications:
 
@@ -2151,10 +2779,14 @@ The current evidence must be interpreted with the following qualifications:
 - Phase 2B passed for the predefined local-difference and simple global-symmetry families, but average Hamming behavior does not establish formal differential bounds or exclude structured high-probability trails;
 - the Phase 2B round trace is implementation-consistent but not a completely independent reimplementation;
 - the Phase 2B global bit tests had strong power for large persistent effects but cannot exclude every isolated sub-percentage bias after correction across 17,568 hypotheses;
+- Phase 2C confirmed 64 add-one raw-encoder aggregate correlations but found no confirmed `FOLD` bit effect;
+- Phase 2D confirmed that all source-conditioned effects came from lane 0 and established the exact data/counter block-shift identity;
+- the Phase 2D automatic stage family compared equal block indices and therefore could not detect the cross-block identity $B_r(x+e_0,b)=B_r(x,b+1)$;
+- the Phase 2D production `PASS` concerns an ordinary add-one perturbation before `A_PRE`; it does not test chosen branch inputs that force an exact $e_0$ difference after `A_PRE`;
+- the exact 24-factor shifted overlap was checked in all 40 archived source-lane-0 raw samples, while rejection-sensitive behavior over every executed case was not exported as a full factor-stream proof;
 - the Phase 2A standard profile used reduced fields and small samples for several experiments;
 - the production-permutation KAT was skipped in the recorded algebraic run;
 - the SageMath/Gröbner experiment was skipped;
-- the encoder-correlation observation has not been confirmed with adequate power or multiple-testing correction;
 - the no-braid knockout result concerns avalanche only and does not establish component redundancy;
 - no complete independent cryptanalytic evaluation has been performed;
 - successful ASan and UBSan execution remains pending.
@@ -2166,23 +2798,69 @@ The evidence does **not** support statements such as:
 - “CTC-Σ provides 256-bit preimage security.”
 - “Twelve rounds are proven sufficient.”
 - “The braid layer adds a quantified security margin.”
-- “The observed differential spectrum is harmless in the complete construction.”
+- “The confirmed encoder relation is harmless in the complete construction.”
+- “The ordinary pre-`A_PRE` propagation PASS closes the encoder finding.”
 - “The research model has been fully validated against the production implementation.”
 - “CTC-Σ is safe for passwords, signatures, blockchains, files, or network protocols.”
 
-# 12. Next research actions
+# 14. Next research actions
 
 ## Immediate
 
-1. Preserve the Phase 1B and Phase 2B result archives, research-source archives, configurations, manifests, and SHA-256 hashes together.
-2. Record Phase 2B as `PASS` while keeping the overall Phase 2 status `REVIEW / INCOMPLETE`.
-3. Execute `production_permutation_kat` against the current CTC-Σ known-answer vectors.
-4. Confirm the reduced-field S-box differential spectrum with a larger field and a substantially larger random-permutation baseline.
-5. Propagate the strongest known S-box differences through complete ARITH, branch, and reduced-round Feistel paths.
-6. Execute a statistically powered encoder related-input study with multiple-testing correction.
-7. Compare full and no-braid variants using attack-oriented metrics rather than ordinary avalanche alone.
-8. Repair or replace the sanitizer environment and complete Phase 0F.
-9. Continue using a clean source-tree commit or immutable source archive for every cryptanalytic execution.
+1. Preserve the Phase 1B, Phase 2B, Phase 2C, and Phase 2D result archives, research-source archives, configurations, manifests, and SHA-256 hashes together.
+2. Record Phase 2C as `REVIEW`, Phase 2D as `REVIEW`, and the ordinary pre-`A_PRE` propagation sub-result as `PASS` within its tested family.
+3. Execute a chosen-post-`A_PRE` propagation study that constructs $R=A_{\mathrm{PRE}}^{-1}(M)$ and $R'=A_{\mathrm{PRE}}^{-1}(M+e_0)$.
+4. Track the exact cross-block relation, rejection behavior, shifted factor overlap, Garside normal forms, `FOLD`, pre- and post-`A_POST` states, and reduced-round Feistel outputs.
+5. Do not change the full CTC-Σ core until the propagation impact is measured; however, treat the encoder counter-injection rule as a likely redesign target before production.
+6. Execute `production_permutation_kat` against the current CTC-Σ known-answer vectors.
+7. Confirm the reduced-field S-box differential spectrum with a larger field and a substantially larger random-permutation baseline.
+8. Compare full and no-braid variants using attack-oriented metrics rather than ordinary avalanche alone.
+9. Repair or replace the sanitizer environment and complete Phase 0F.
+10. Continue using a clean source-tree commit or immutable source archive for every cryptanalytic execution.
+
+## Exact encoder-relation propagation
+
+The next focused study should:
+
+1. Generate arbitrary mixed states $M$ and construct exact preimages through `A_PRE` inverse.
+2. Verify, before all statistical analysis, that the two production paths reach $M$ and $M+e_0$ immediately before the encoder.
+3. Compare related block `b` with base block `b+1`, not only equal block indices.
+4. Record candidate-acceptance masks and rejection locations for every generated block.
+5. Measure exact shifted overlap for signs, Lehmer indices, factors, and complete words.
+6. Compare Garside outputs using:
+   - exact normal-form equality;
+   - infimum difference;
+   - canonical-length difference;
+   - common prefix and suffix lengths;
+   - group quotient or conjugacy-related features where feasible.
+7. Measure `FOLD`, direct-path, `A_POST`, branch, and reduced-round Feistel propagation.
+8. Compare against independent controls and apply predeclared multiple-testing correction.
+9. Preserve raw examples for both ordinary accepted-block cases and rejection-boundary cases.
+10. Determine whether the shared 24-factor middle word yields a useful group-theoretic simplification or differential advantage.
+
+## Encoder redesign criteria
+
+A replacement counter-injection method should be evaluated only after the propagation study. Any candidate should satisfy:
+
+- no exact equivalence between changing input data and advancing the internal block counter;
+- explicit domain separation between user-derived state and block index;
+- deterministic cross-platform behavior;
+- preserved unbiased candidate decoding and rejection behavior;
+- compatibility with inverse, reproducibility, and known-answer testing requirements;
+- no reduction in measured diffusion or structural resistance;
+- acceptable performance and implementation complexity.
+
+Potential design families may include a separately derived block constant or a dedicated counter-domain transformation, but no replacement should be adopted without repeating correctness, statistical, structural, and differential tests.
+
+After any encoder redesign, at minimum rerun:
+
+- Phase 0 functional and reproducibility tests;
+- Phase 1 diffusion tests;
+- Phase 1B-style targeted bit confirmation where relevant;
+- Phase 2B production differential tests;
+- Phase 2C encoder-dependence tests;
+- Phase 2D localization and propagation tests;
+- known-answer vectors and cross-compiler evidence.
 
 ## Algebraic and differential confirmation
 
@@ -2210,15 +2888,6 @@ The evidence does **not** support statements such as:
    - multiple Feistel rounds;
    - mixed arithmetic and braid-derived features.
 
-## Encoder confirmation
-
-1. Use at least 512 samples per seed.
-2. Execute at least 10 independent seeds.
-3. Record confidence intervals for each position pair.
-4. Apply false-discovery-rate or family-wise-error correction.
-5. Analyze mutual information and non-linear dependence in addition to Pearson correlation.
-6. Compare the related inputs $u+h e_0$ for larger $h$ ranges.
-
 ## Braid-layer contribution
 
 Compare full and modified constructions using metrics beyond avalanche:
@@ -2237,6 +2906,24 @@ Compare full and modified constructions using metrics beyond avalanche:
 
 The braid layer should be considered cryptographically justified only after it produces a measurable improvement against one or more relevant attack classes.
 
+## Phase 2D disposition
+
+The direct lane-0 input/counter relation is confirmed. Therefore:
+
+1. finding `F2D-001` remains open for complete-path impact but closed as to existence;
+2. same-index stage tests must not be used to claim the relation disappears inside `A_ENC`;
+3. the ordinary pre-`A_PRE` propagation result is recorded as a narrow negative result, not a closure of the chosen-state question;
+4. counter-injection redesign work may be prepared in parallel, but parameter changes should wait for exact propagation evidence;
+5. production-readiness language must explicitly mention the confirmed encoder relation.
+
+## Phase 2C disposition
+
+The statistically powered study confirmed the earlier encoder suspicion. Therefore:
+
+1. finding `F2A-003` is superseded;
+2. finding `F2C-001` is recorded as `CONFIRMED`;
+3. the absence of corrected `FOLD` bit effects remains a scoped negative result;
+4. future encoder analysis must use source-lane conditioning and shifted-block comparisons.
 
 ## Phase 2B disposition
 
@@ -2248,7 +2935,7 @@ Therefore:
 2. the tested global negation, scaling, lane-order, lane-rotation, and half-swap transformations are recorded as non-commuting at the final permutation;
 3. no final bit-bias finding is opened from this study;
 4. output bit 929 under the half-swap commutation residual remains an exploratory, unconfirmed candidate only;
-5. future Phase 2 work must focus on differential probabilities, S-box structure, encoder dependence, braid contribution, and algebraic attacks rather than repeat broad avalanche tests.
+5. future Phase 2 work must focus on exact structural relations, differential probabilities, S-box structure, braid contribution, and algebraic attacks rather than repeat broad avalanche tests.
 
 ## Phase 1B disposition
 
@@ -2257,10 +2944,10 @@ The pre-registered bit-159 hypothesis was not confirmed. Therefore:
 1. Phase 1 is closed as `PASS` within the tested statistical scope.
 2. Finding `F1-001` is closed as `NOT REPRODUCED`.
 3. The exploratory 40-byte and 63-byte observations remain documented but do not currently justify a new confirmatory phase.
-4. The principal research effort proceeds to Phase 2 differential and algebraic cryptanalysis.
+4. The principal research effort proceeds to Phase 2 differential, structural, and algebraic cryptanalysis.
 5. Formal Phase 3 performance profiling may begin in parallel.
 
-# 13. Update procedure
+# 15. Update procedure
 
 When adding a new study:
 
@@ -2278,7 +2965,47 @@ When adding a new study:
 
 ---
 
-# 14. Research record change log
+# 16. Research record change log
+
+## 2026-07-11 — Phase 2D encoder localization and structural analysis completed
+
+Added:
+
+- Phase 2D execution provenance, configuration, integrity, and trace-consistency results;
+- reproduction of all 64 direct aggregate add-one correlations;
+- source-conditioned localization to lane 0 only;
+- the `0.720403`–`0.777528` source-conditioned correlation range;
+- the distinction between same-index stage comparisons and the correct cross-block comparison;
+- the exact identity $B_r(x+e_0,b)=B_r(x,b+1)$;
+- independent verification of exact block shifting and 24-factor overlap in all 40 archived source-lane-0 raw samples;
+- ordinary pre-`A_PRE` production-path results with zero confirmed encoder, Hamming, or final branch-bit effects;
+- the limitation that chosen branch inputs can force the exact post-`A_PRE` relation;
+- finding `F2D-001`, classified as confirmed with complete-construction impact unknown;
+- finding `F2D-002`, classified as not observed within the ordinary tested production family;
+- updated security interpretation, design status, and next-action priorities.
+
+The study completed 25,600 cases with zero failures, zero warnings, zero trace mismatches, and a clean core tree. The direct effect was entirely attributable to source lane 0. The archived raw evidence and the encoder definition show that adding one to lane 0 aliases advancing the block counter by one. This is a confirmed design-level structural relation, not a demonstrated complete-construction attack.
+
+---
+
+## 2026-07-11 — Phase 2C encoder dependence confirmation completed
+
+Added:
+
+- Phase 2C objective and predeclared statistical criteria;
+- execution provenance for 160,000 cases across ten seed groups, four rounds, and four related-input families;
+- 3,072 encoder correlation tests and 7,808 `FOLD` bit tests;
+- 64 confirmed correlations, all within the add-one family and lane-aggregate sign/rank metrics;
+- correlation magnitude, control excess, and seed-replication results;
+- same-position factor sensitivity, normal-form comparison, and `FOLD` Hamming results;
+- zero exact encoder words, normal forms, or `FOLD` outputs;
+- zero confirmed `FOLD` output-bit effects;
+- finding `F2C-001`, classified as confirmed at the raw encoder aggregate level;
+- the supersession of the underpowered Phase 2A encoder observation.
+
+Phase 2C established that the earlier encoder signal was real but smaller and more specific than the initial 32-sample estimate. The study did not explain the cause and did not demonstrate persistence after Garside normalization or `FOLD`; Phase 2D subsequently localized the cause.
+
+---
 
 ## 2026-07-11 — Phase 2B eight-hour production study completed
 
@@ -2367,7 +3094,7 @@ Added:
 
 ---
 
-## 14. Maintainer note
+# 17. Maintainer note
 
 This file should remain readable by:
 
