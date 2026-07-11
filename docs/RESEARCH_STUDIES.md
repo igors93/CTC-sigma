@@ -113,7 +113,9 @@ All studies must follow these principles:
 | Phase 0 overall | Correctness and reproducibility baseline | INCOMPLETE | Functionally successful, but sanitizer execution remains pending. |
 | Phase 1 | Statistical behavior and diffusion | PASS | General behavior was strong; the isolated Hash256 bit-159 observation was not reproduced by the confirmatory study. |
 | Phase 1B | Hash256 anomaly confirmation | PASS | Across 20,000 paired perturbations and 10 seeds, bit 159 showed no significant or consistent deviation from 50%. |
-| Phase 2 | Reduced-round and algebraic cryptanalysis | PARTIALLY STARTED | Phase 2A standard algebraic baseline completed; three findings remain under review, and production KAT/solver confirmation are pending. |
+| Phase 2A | Algebraic and structural baseline | REVIEW / INCOMPLETE | Reduced-field differential structure and two underpowered structural observations remain open; production KAT and solver confirmation are pending. |
+| Phase 2B | Production differential diffusion and simple symmetries | PASS | An eight-hour run completed 332,241 paired cases; all tested local differences reached near-50% diffusion by round 3 or earlier, and no tested global transformation commuted with the final permutation. |
+| Phase 2 overall | Differential, structural, and algebraic cryptanalysis | REVIEW / INCOMPLETE | Phase 2B strengthened the production diffusion evidence, but the open S-box, encoder, braid-contribution, and algebraic-solver questions are not resolved. |
 | Phase 3 | Performance analysis | NOT STARTED | Preliminary measurements indicate that the reference implementation is slow. |
 | Phase 4 | Comparison with other algorithms | NOT STARTED | Pending stable benchmark methodology. |
 | Phase 5 | Implementation security | PARTIALLY STARTED | Static CI exists; dedicated fuzzing and successful sanitizer runs remain pending. |
@@ -1626,7 +1628,481 @@ The `REVIEW` result is caused by the differential spectrum and the two unconfirm
 
 ---
 
-# 9. Preliminary performance observation
+
+# 9. Phase 2B — High-power production differential validation
+
+## 9.1 Objective
+
+Phase 2B was designed as an eight-hour confirmatory production study.
+
+Its primary question was:
+
+> Do predefined local differences and simple global algebraic or lane transformations leave persistent, reproducible structure after the production 12-round permutation?
+
+Unlike the reduced-field and reduced-lane experiments of Phase 2A, this study exercised the compiled production C library and tracked the propagation of differences through all twelve Feistel rounds.
+
+The study evaluated:
+
+- six local differential families;
+- six global symmetry or commutation families;
+- diffusion after every round;
+- final Hamming-distance distributions;
+- final per-bit frequencies;
+- exact commutation counts;
+- cross-seed persistence;
+- agreement between the public branch-based round trace and the official production permutation.
+
+This study did not attempt to calculate a formal differential-security bound.
+
+---
+
+## 9.2 Predeclared hypotheses and thresholds
+
+The experiment registered the following hypotheses before interpreting the final data.
+
+```text
+H1  Every local differential family has a final mean changed-bit
+    fraction in [0.49, 0.51].
+
+H2  After one global false-discovery-rate correction across all final
+    output-bit tests, no bit has q < 0.001, absolute effect >= 0.005,
+    and the same direction in at least 8 of 10 seeds.
+
+H3  Every local family enters and remains in [0.49, 0.51] by round 4.
+
+H4  No tested global transformation commutes exactly with the final
+    production permutation.
+
+H5  Every final commutation residual has a mean changed-bit fraction
+    in [0.49, 0.51] and no confirmed biased bit.
+
+H6  The public branch trace agrees exactly with
+    ctc_permutation_apply on every verification case.
+```
+
+The principal predeclared thresholds were:
+
+```text
+seed groups:                         10
+minimum cases per seed/category:    1,000
+global FDR threshold:               q = 0.001
+minimum bit-bias effect:            0.5 percentage point
+minimum consistent seed count:      8 of 10
+maximum diffusion convergence:      round 4
+allowed exact final commutations:   0
+allowed production-trace mismatch:  0
+```
+
+A `PASS` under these rules means that no listed review or hard-failure condition was triggered. It is not a cryptographic-security proof.
+
+---
+
+## 9.3 Execution provenance and evidence integrity
+
+The completed production run recorded:
+
+```text
+run id:                       20260711T002528Z
+profile:                      standard
+active duration:              8.000 hours
+start time:                   2026-07-11 00:25:28 UTC
+finish time:                  2026-07-11 08:25:29 UTC
+paired task count:            332,241
+complete cycles:              2,768
+seed groups:                  10
+categories:                   12
+seed/category cells:          120
+minimum cases in any cell:    2,768
+maximum cases in any cell:    2,769
+required minimum per cell:    1,000
+final verdict:                PASS
+```
+
+The analyzed source state was:
+
+```text
+core commit:
+e60c7d5c093b87485697241bd16138523f556a00
+
+Git working tree:
+clean
+
+production library SHA-256:
+18080dc792a85a0cde06eaa8f91b34837657c691a126746f86f402511ee4253f
+```
+
+The preserved result archive was:
+
+```text
+20260711T002528Z.zip
+
+SHA-256:
+2827983c41dbe4862ed559d7ed3fec404b0329c2b61da73d5c5971edc0bdba5d
+```
+
+Evidence-integrity checks produced:
+
+```text
+manifest entries verified: 49 of 49
+manifest mismatches:        0
+hourly snapshot archives:   9
+corrupt snapshot archives:  0
+failure records:            0
+warning records:            0
+```
+
+The use of a clean working tree and a preserved library hash improves the traceability of this study relative to earlier exploratory runs.
+
+---
+
+## 9.4 Tested difference and transformation families
+
+### Local differential families
+
+The study used:
+
+1. `single_bit_flip`  
+   Flip exactly one valid state bit.
+
+2. `add_one_lane`  
+   Add one to one field lane.
+
+3. `add_power_of_two_lane`  
+   Add a selected power of two to one lane.
+
+4. `negate_one_lane`  
+   Replace one lane by its additive inverse.
+
+5. `balanced_two_lane_delta`  
+   Add \(+\delta\) to one lane and \(-\delta\) to another lane.
+
+6. `mirrored_half_delta`  
+   Apply the same delta to corresponding lanes in the two Feistel halves.
+
+### Global transformation families
+
+The study tested whether the production permutation retained or commuted with:
+
+1. full-state negation;
+2. multiplication of every lane by \(2\);
+3. multiplication of every lane by \(2^{13}\);
+4. swapping the two Feistel halves;
+5. reversing lane order;
+6. rotating lanes left by one position.
+
+For a transformation \(T\), two quantities were measured:
+
+\[
+P(x)\oplus P(T(x))
+\]
+
+and the commutation residual:
+
+\[
+P(T(x))\oplus T(P(x)).
+\]
+
+An exact zero residual would indicate exact commutation for that tested state.
+
+---
+
+## 9.5 Production round-trace consistency
+
+The research runner reconstructed round progression through the public branch interface and compared its final result with the official production permutation.
+
+The result was:
+
+```text
+verified states:   2,584
+trace mismatches:  0
+```
+
+This supports the correctness of the round-by-round instrumentation used by Phase 2B.
+
+It is not a fully independent implementation comparison because the trace and official path use components from the same compiled C library.
+
+---
+
+## 9.6 Local differential results
+
+The observed changed-bit fractions were:
+
+| Differential family | Round 1 | Round 2 | Round 3 | Round 12 | First round in 49%–51% band |
+|---|---:|---:|---:|---:|---:|
+| `single_bit_flip` | 12.5906% | 37.5376% | 49.9941% | 49.9986% | 3 |
+| `add_one_lane` | 12.6213% | 37.5003% | 49.9937% | 49.9984% | 3 |
+| `add_power_of_two_lane` | 12.6688% | 37.5722% | 50.0101% | 49.9964% | 3 |
+| `negate_one_lane` | 17.2797% | 39.1234% | 49.9953% | 49.9862% | 3 |
+| `balanced_two_lane_delta` | 19.4932% | 44.2786% | 50.0064% | 49.9937% | 3 |
+| `mirrored_half_delta` | 25.2048% | 49.9932% | 49.9948% | 49.9959% | 2 |
+
+### Interpretation
+
+All six local families reached the predeclared 49%–51% band by round 3 or earlier.
+
+The first two rounds continued to expose the expected Feistel propagation structure. By round 3, the mean Hamming behavior was close to the ideal 50% level and remained there through round 12.
+
+No tested local family showed a later loss of diffusion.
+
+The result confirms rapid empirical diffusion for these families. It does not establish that all high-probability differential trails are absent.
+
+---
+
+## 9.7 Global symmetry and commutation results
+
+Final results were:
+
+| Transformation | Final output difference | Final commutation residual | Exact final commutations | Confirmed residual-bit effects |
+|---|---:|---:|---:|---:|
+| `negate_all` | 50.0016% | 49.9984% | 0 | 0 |
+| `scale_all_by_2` | 50.0085% | 50.0095% | 0 | 0 |
+| `scale_all_by_2_power_13` | 49.9991% | 49.9936% | 0 | 0 |
+| `swap_feistel_halves` | 50.0206% | 49.9986% | 0 | 0 |
+| `reverse_lane_order` | 49.9860% | 50.0097% | 0 | 0 |
+| `rotate_lanes_left_1` | 50.0191% | 49.9805% | 0 | 0 |
+
+No tested transformation commuted exactly with the final production permutation.
+
+Within the tested states, this rejects simple universal relations of the forms:
+
+\[
+P(-x)=-P(x),
+\]
+
+\[
+P(2x)=2P(x),
+\]
+
+and:
+
+\[
+P(\operatorname{swap}(x))
+=
+\operatorname{swap}(P(x)).
+\]
+
+Several transformations retained visible partial structure in the first round, but their final output differences and final commutation residuals were near 50%.
+
+---
+
+## 9.8 Final distribution and output-bit analysis
+
+The valid encoded state contains:
+
+```text
+976 bits
+```
+
+For an ideal independent bit model, the expected Hamming distance is:
+
+\[
+976/2=488
+\]
+
+with ideal binomial standard deviation:
+
+\[
+\sqrt{976\cdot0.5\cdot0.5}\approx15.6205.
+\]
+
+Across the eighteen final metrics—six local outputs, six symmetry output differences, and six symmetry commutation residuals—the observed values were:
+
+```text
+minimum final mean:             487.8093 bits
+maximum final mean:             488.2007 bits
+minimum final fraction:         49.98046%
+maximum final fraction:         50.02057%
+minimum observed std. dev.:     15.5279 bits
+maximum observed std. dev.:     15.7289 bits
+```
+
+All sixteen lanes were affected in every recorded final metric sample.
+
+### Global output-bit testing
+
+The study performed:
+
+```text
+18 final metrics × 976 state bits = 17,568 tests
+```
+
+One global Benjamini–Hochberg correction was applied with:
+
+```text
+q = 0.001
+```
+
+The result was:
+
+```text
+rejections before effect filtering: 0
+confirmed effects:                  0
+replicated effects:                 0
+```
+
+No final output bit was classified as persistently biased under the predeclared rules.
+
+---
+
+## 9.9 Exploratory bit-929 observation
+
+The most deviant pooled bit occurred in the final commutation residual for `swap_feistel_halves`:
+
+```text
+bit:                  929
+frequency:            51.3111%
+absolute deviation:   1.3111 percentage points
+nominal p-value:      approximately 1.32 × 10^-5
+within-metric adjusted p-value:
+                      approximately 0.01048
+required threshold:   below 0.001
+```
+
+This observation did not pass the predeclared multiple-testing threshold and was not classified as a confirmed effect.
+
+Its correct status is:
+
+```text
+Exploratory candidate — not statistically confirmed
+```
+
+It may be retested in a future pre-registered study focused specifically on the same transformation and output bit. It does not change the Phase 2B `PASS` verdict.
+
+---
+
+## 9.10 Statistical scope and power limitation
+
+Phase 2B had strong power for:
+
+- large deviations in mean avalanche;
+- slow convergence of the tested difference families;
+- exact commutation;
+- large persistent output-bit biases;
+- broad lane failures;
+- production trace mismatches.
+
+However, the test family was large:
+
+```text
+17,568 simultaneous final bit hypotheses
+```
+
+After a very strict global correction, approximately 27,687 observations per pooled bit metric are not sufficient to exclude every isolated effect as small as the nominal 0.5-percentage-point threshold with high power.
+
+Therefore, the correct conclusion is:
+
+> No large, globally significant, and reproducible final output-bit effect was detected.
+
+The correct conclusion is not:
+
+> Every possible final bit bias greater than 0.5 percentage point has been excluded.
+
+This distinction preserves the real statistical reach of the experiment.
+
+---
+
+## 9.11 What Phase 2B confirmed
+
+Within the tested implementation, state encoding, sample design, and transformation families:
+
+1. all six local differential families reached mean diffusion near 50% by round 3 or earlier;
+2. the near-50% behavior remained stable through round 12;
+3. final Hamming-distance means and standard deviations were close to an ideal binomial reference;
+4. all lanes were active in final outputs;
+5. none of the six global transformations commuted exactly with the final permutation;
+6. no final output bit survived the predeclared global multiple-testing correction;
+7. no production trace mismatch occurred in 2,584 verification states;
+8. checkpointing and hourly snapshots preserved a complete eight-hour execution.
+
+---
+
+## 9.12 What Phase 2B did not resolve
+
+This battery did not directly test:
+
+- the complete differential distribution of the production S-boxes;
+- the reduced-field uniformity values 14 and 12 from Phase 2A;
+- formal propagation probabilities for the strongest S-box differentials;
+- the exact central S-box relation:
+  \[
+  S(-2C-x)=2A-S(x);
+  \]
+- encoder related-input correlations;
+- full versus no-braid attack resistance;
+- the security contribution of Garside normalization;
+- higher-degree invariants;
+- SAT, SMT, Gröbner, or other algebraic solving;
+- collision or preimage resistance;
+- integral, rebound, boomerang, interpolation, or rotational attacks;
+- all possible affine or non-linear symmetries.
+
+Near-ideal average Hamming distance does not exclude a carefully structured high-probability differential.
+
+---
+
+## 9.13 Infrastructure observation
+
+The final checkpoint recorded:
+
+```text
+snapshot_count:               9
+last_snapshot_active_second:  0.0
+```
+
+All nine snapshot ZIP files were present and valid.
+
+The zero value is therefore a metadata bookkeeping inconsistency rather than evidence loss. It should be corrected in a future runner revision, but it does not affect the completed Phase 2B measurements.
+
+---
+
+## 9.14 Phase 2B conclusion
+
+### Confirmed within the tested scope
+
+- rapid production-round diffusion;
+- stable final near-50% changed-bit behavior;
+- no tested exact final global commutation;
+- no confirmed final output-bit bias;
+- correct agreement between the round trace and official production output;
+- complete checkpoint and snapshot preservation.
+
+### Phase result
+
+```text
+Phase 2B:
+PASS
+```
+
+### Effect on the overall Phase 2 status
+
+```text
+Phase 2 overall:
+REVIEW / INCOMPLETE
+```
+
+Phase 2B strengthens the evidence that the full production permutation rapidly destroys the tested simple local differences and global symmetries.
+
+The overall phase remains open because the following Phase 2A findings have not been resolved:
+
+```text
+F2A-001 — Exact local S-box central symmetry:
+OPEN
+
+F2A-002 — Reduced-field differential uniformity 14/12:
+OPEN
+
+F2A-003 — Encoder related-input correlation:
+OPEN
+
+F2A-004 — Measurable cryptographic contribution of the braid layer:
+OPEN
+```
+
+The next confirmatory work should target these findings directly rather than repeat ordinary avalanche testing.
+
+---
+
+# 10. Preliminary performance observation
 
 Performance was not the primary target of Phases 0 or 1.
 
@@ -1663,15 +2139,18 @@ The current implementation prioritizes reference clarity and testability over op
 
 ---
 
-# 10. Current security interpretation
+# 11. Current security interpretation
 
 The evidence currently supports the following statement:
 
-> The evaluated CTC-Σ implementation is functionally coherent in the tested environment and exhibits strong observed diffusion and generally balanced statistical behavior. The isolated Hash256 bit-159 observation from the initial Phase 1 matrix was not reproduced by a pre-registered confirmatory study of 20,000 paired perturbations across ten seeds. The initial algebraic baseline did not reveal an immediate mathematical contradiction, a simple low-degree invariant, a preserved tested subspace, or a simple Mersenne-related symmetry. The reduced S-boxes nevertheless exhibited structured differential behavior above the limited random baseline, and the current evidence has not yet quantified a security contribution from the braid layer. No practical cryptographic attack has been demonstrated. These results are insufficient to claim cryptographic security or production readiness.
+> The evaluated CTC-Σ implementation is functionally coherent in the tested environment and exhibits strong observed diffusion and generally balanced statistical behavior. The isolated Hash256 bit-159 observation from the initial Phase 1 matrix was not reproduced by a pre-registered confirmatory study of 20,000 paired perturbations across ten seeds. The eight-hour Phase 2B production study completed 332,241 paired cases and found that all six tested local differential families reached near-50% mean diffusion by round three or earlier, while none of the six tested global transformations commuted exactly with the final permutation. No final output-bit effect survived the predeclared global multiple-testing correction, and no production trace mismatch was observed. The initial algebraic baseline nevertheless identified an exact local S-box symmetry, elevated reduced-field differential uniformity, an underpowered encoder-correlation observation, and an unresolved question about the measurable security contribution of the braid layer. No practical cryptographic attack has been demonstrated. These results are insufficient to claim cryptographic security or production readiness.
 
 The current evidence must be interpreted with the following qualifications:
 
 - Phase 1 and Phase 1B passed within their tested statistical scope, but statistical tests cannot establish collision, preimage, differential, or algebraic security;
+- Phase 2B passed for the predefined local-difference and simple global-symmetry families, but average Hamming behavior does not establish formal differential bounds or exclude structured high-probability trails;
+- the Phase 2B round trace is implementation-consistent but not a completely independent reimplementation;
+- the Phase 2B global bit tests had strong power for large persistent effects but cannot exclude every isolated sub-percentage bias after correction across 17,568 hypotheses;
 - the Phase 2A standard profile used reduced fields and small samples for several experiments;
 - the production-permutation KAT was skipped in the recorded algebraic run;
 - the SageMath/Gröbner experiment was skipped;
@@ -1691,16 +2170,19 @@ The evidence does **not** support statements such as:
 - “The research model has been fully validated against the production implementation.”
 - “CTC-Σ is safe for passwords, signatures, blockchains, files, or network protocols.”
 
-# 11. Next research actions
+# 12. Next research actions
 
 ## Immediate
 
-1. Preserve the Phase 1B result archive, research-source archive, configuration, manifests, and SHA-256 hashes together.
-2. Update all public phase summaries so that Phase 1 and Phase 1B are recorded as `PASS` within the tested statistical scope.
+1. Preserve the Phase 1B and Phase 2B result archives, research-source archives, configurations, manifests, and SHA-256 hashes together.
+2. Record Phase 2B as `PASS` while keeping the overall Phase 2 status `REVIEW / INCOMPLETE`.
 3. Execute `production_permutation_kat` against the current CTC-Σ known-answer vectors.
-4. Run the full algebra profile with the exact research-suite archive preserved.
-5. Repair or replace the sanitizer environment and complete Phase 0F.
-6. Record a clean source-tree commit or immutable source archive for every future cryptanalytic execution.
+4. Confirm the reduced-field S-box differential spectrum with a larger field and a substantially larger random-permutation baseline.
+5. Propagate the strongest known S-box differences through complete ARITH, branch, and reduced-round Feistel paths.
+6. Execute a statistically powered encoder related-input study with multiple-testing correction.
+7. Compare full and no-braid variants using attack-oriented metrics rather than ordinary avalanche alone.
+8. Repair or replace the sanitizer environment and complete Phase 0F.
+9. Continue using a clean source-tree commit or immutable source archive for every cryptanalytic execution.
 
 ## Algebraic and differential confirmation
 
@@ -1755,6 +2237,19 @@ Compare full and modified constructions using metrics beyond avalanche:
 
 The braid layer should be considered cryptographically justified only after it produces a measurable improvement against one or more relevant attack classes.
 
+
+## Phase 2B disposition
+
+The eight-hour production study passed all predeclared hypotheses.
+
+Therefore:
+
+1. the tested local differential families are recorded as rapidly diffusing in the production permutation;
+2. the tested global negation, scaling, lane-order, lane-rotation, and half-swap transformations are recorded as non-commuting at the final permutation;
+3. no final bit-bias finding is opened from this study;
+4. output bit 929 under the half-swap commutation residual remains an exploratory, unconfirmed candidate only;
+5. future Phase 2 work must focus on differential probabilities, S-box structure, encoder dependence, braid contribution, and algebraic attacks rather than repeat broad avalanche tests.
+
 ## Phase 1B disposition
 
 The pre-registered bit-159 hypothesis was not confirmed. Therefore:
@@ -1765,7 +2260,7 @@ The pre-registered bit-159 hypothesis was not confirmed. Therefore:
 4. The principal research effort proceeds to Phase 2 differential and algebraic cryptanalysis.
 5. Formal Phase 3 performance profiling may begin in parallel.
 
-# 12. Update procedure
+# 13. Update procedure
 
 When adding a new study:
 
@@ -1783,7 +2278,33 @@ When adding a new study:
 
 ---
 
-# 13. Research record change log
+# 14. Research record change log
+
+## 2026-07-11 — Phase 2B eight-hour production study completed
+
+Added:
+
+- Phase 2B objective, predeclared hypotheses, and thresholds;
+- execution provenance for the eight-hour production run;
+- result-archive, core-commit, and library hashes;
+- manifest and hourly-snapshot integrity results;
+- six local differential-family results across all twelve rounds;
+- six global symmetry and commutation results;
+- production trace verification;
+- final Hamming-distribution and global output-bit analysis;
+- the exploratory, non-confirmed bit-929 observation;
+- the statistical-power limitation of the global bit analysis;
+- the infrastructure note concerning `last_snapshot_active_second`;
+- the Phase 2B `PASS` conclusion;
+- the retained `REVIEW / INCOMPLETE` classification for Phase 2 overall;
+- revised current-security interpretation and next actions.
+
+The run completed 332,241 paired cases across ten seed groups and twelve predefined categories. Every local family reached the 49%–51% mean changed-bit band by round three or earlier. No tested global transformation commuted exactly with the final production permutation. No output bit survived the predeclared global FDR correction, and no trace mismatch was found in 2,584 verification states.
+
+The result strengthens the empirical production-diffusion evidence but does not close the open Phase 2A findings or establish formal differential-security bounds.
+
+---
+
 
 ## 2026-07-10 — Phase 1B confirmatory study completed
 
