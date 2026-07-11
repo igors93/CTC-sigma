@@ -65,8 +65,13 @@ ctc_status_t ctc_fold_tokenize_normal_form(
     if (normal_form == NULL || tokens_out == NULL) {
         return CTC_STATUS_INVALID_ARGUMENT;
     }
-    if (normal_form->factor_count > CTC_MAX_NORMAL_FACTORS) {
+    if (round_index >= CTC_FEISTEL_ROUNDS) {
         return CTC_STATUS_OUT_OF_RANGE;
+    }
+
+    status = ctc_braid_validate_normal_form(normal_form);
+    if (status != CTC_STATUS_OK) {
+        return status;
     }
 
     memset(tokens_out, 0, sizeof(*tokens_out));
@@ -103,9 +108,6 @@ ctc_status_t ctc_fold_tokenize_normal_form(
 
     for (size_t index = 0U; index < normal_form->factor_count; ++index) {
         const uint16_t factor = normal_form->factors[index];
-        if ((uint32_t)factor >= CTC_SIMPLE_FACTOR_COUNT) {
-            return CTC_STATUS_OUT_OF_RANGE;
-        }
         status = ctc_append_token(
             tokens_out,
             index < prefix_count ? CTC_TOKEN_DROP_FACTOR : CTC_TOKEN_KEEP_FACTOR,
@@ -153,6 +155,9 @@ ctc_status_t ctc_fold_normal_form(
 
     if (normal_form == NULL || folded_state_out == NULL) {
         return CTC_STATUS_INVALID_ARGUMENT;
+    }
+    if (round_index >= CTC_FEISTEL_ROUNDS) {
+        return CTC_STATUS_OUT_OF_RANGE;
     }
 
     status = ctc_fold_tokenize_normal_form(normal_form, round_index, &tokens);

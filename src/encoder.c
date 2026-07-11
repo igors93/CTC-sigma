@@ -5,7 +5,6 @@
 #include <string.h>
 
 #include "ctc_sigma/arith.h"
-#include "ctc_sigma/field.h"
 #include "ctc_sigma/parameters.h"
 
 ctc_status_t ctc_encoder_decode_candidate(
@@ -52,6 +51,43 @@ ctc_status_t ctc_encoder_decode_candidate(
     return CTC_STATUS_OK;
 }
 
+ctc_status_t ctc_encoder_generate_block(
+    const uint64_t mixed_input[8],
+    uint32_t round_index,
+    uint32_t block_index,
+    uint64_t block_out[8]
+) {
+    uint64_t block[CTC_BRANCH_LANES];
+    ctc_status_t status;
+
+    if (mixed_input == NULL || block_out == NULL) {
+        return CTC_STATUS_INVALID_ARGUMENT;
+    }
+    if (round_index >= CTC_FEISTEL_ROUNDS
+        || block_index >= CTC_ENCODER_MAX_BLOCKS) {
+        return CTC_STATUS_OUT_OF_RANGE;
+    }
+
+    /*
+     * CTC-Sigma v0.2 domain-separates the block in A_ENC's constants. The
+     * data vector must remain byte-for-byte unchanged before the first
+     * nonlinear subround, otherwise input/counter aliasing can reappear.
+     */
+    memcpy(block, mixed_input, sizeof(block));
+    status = ctc_arith_apply_encoder(
+        round_index,
+        block_index,
+        block,
+        CTC_ARITH_ENCODER_SUBROUNDS
+    );
+    if (status != CTC_STATUS_OK) {
+        return status;
+    }
+
+    memcpy(block_out, block, sizeof(block));
+    return CTC_STATUS_OK;
+}
+
 ctc_status_t ctc_encoder_generate_factors(
     const uint64_t mixed_input[8],
     uint32_t round_index,
@@ -63,21 +99,26 @@ ctc_status_t ctc_encoder_generate_factors(
     if (mixed_input == NULL || factors_out == NULL) {
         return CTC_STATUS_INVALID_ARGUMENT;
     }
+    if (round_index >= CTC_FEISTEL_ROUNDS) {
+        return CTC_STATUS_OUT_OF_RANGE;
+    }
+
+    memset(factors_out, 0, sizeof(*factors_out) * CTC_FACTORS_PER_BRANCH);
+    if (generated_block_count_out != NULL) {
+        *generated_block_count_out = 0U;
+    }
 
     for (uint32_t block_index = 0U;
          block_index < CTC_ENCODER_MAX_BLOCKS && generated < CTC_FACTORS_PER_BRANCH;
          ++block_index) {
-        uint64_t block[8];
-        ctc_status_t status;
-
-        memcpy(block, mixed_input, sizeof(block));
-        block[0] = ctc_field_add(block[0], (uint64_t)block_index);
-        status = ctc_arith_apply(
-            "A_ENC",
+        uint64_t block[CTC_BRANCH_LANES];
+        ctc_status_t status = ctc_encoder_generate_block(
+            mixed_input,
             round_index,
-            block,
-            CTC_ARITH_ENCODER_SUBROUNDS
+            block_index,
+            block
         );
+
         if (status != CTC_STATUS_OK) {
             return status;
         }

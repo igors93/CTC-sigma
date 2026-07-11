@@ -27,6 +27,9 @@ ctc_status_t ctc_branch_apply_with_normalizer(
     if (right_half == NULL || normalizer == NULL || branch_output == NULL) {
         return CTC_STATUS_INVALID_ARGUMENT;
     }
+    if (round_index >= CTC_FEISTEL_ROUNDS) {
+        return CTC_STATUS_OUT_OF_RANGE;
+    }
 
     memcpy(mixed_input, right_half, sizeof(mixed_input));
     status = ctc_arith_apply(
@@ -59,8 +62,9 @@ ctc_status_t ctc_branch_apply_with_normalizer(
     if (status != CTC_STATUS_OK) {
         return status;
     }
-    if (normal_form.factor_count > CTC_MAX_NORMAL_FACTORS) {
-        return CTC_STATUS_OUT_OF_RANGE;
+    status = ctc_braid_validate_normal_form(&normal_form);
+    if (status != CTC_STATUS_OK) {
+        return status;
     }
 
     status = ctc_fold_normal_form(&normal_form, round_index, folded_normal_form);

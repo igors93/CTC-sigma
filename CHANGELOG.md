@@ -7,6 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed — CTC-Sigma v0.2 encoder redesign (2026-07-11)
+
+- Removed the structural v0.1 identity created by adding `block_index` to
+  encoder lane 0. Blocks now use `v_h = A_ENC_{i,h}(u)`, where the block is a
+  public tweak of every round and S-box constant in all four subrounds.
+- Added the exact `CTC-SIGMA-v0.2|A_ENC-TWEAK|` seed encoding with separate
+  LE32 fields for round, block, subround, and lane; no packed-index truncation.
+- Added forward/inverse tweakable encoder arithmetic and a public raw-block
+  helper used by production code and regression tests.
+- Added canonical validation for injected Garside normal forms: factors must be
+  proper ranks 1..40318 and adjacent pairs must be left-weighted. The branch
+  and FOLD both reject malformed representations.
+- Corrected the README's historical constant prefix to
+  `CTC-SIGMA-v0.1|` without changing preserved non-encoder constants.
+
+### Added — v0.2 validation and vectors (2026-07-11)
+
+- Independent Python checks for the exact encoder constant seed, component and
+  block domain separation, range validation, and per-block inverse round trips.
+- Structural regression tests over all 12 rounds proving the old direct
+  `u+e_0,h` versus `u,h+1` equality is not reintroduced.
+- Negative tests for identity, Delta, and non-left-weighted injected normal
+  forms before FOLD.
+- Frozen v0.2 Hash256, XOF, permutation, encoder-block, and factor-stream KATs.
+- Representative encoder constant manifest plus an exact SHA-256 checksum.
+
+### Compatibility
+
+- v0.2 changes the branch function, so permutation, Hash256, and XOF outputs
+  are intentionally incompatible with v0.1. The v0.1 KAT file is retained as
+  a historical snapshot and is no longer used by the active test suite.
+
 ### Added — continuous integration (2026-07-10)
 
 - GitHub Actions workflow (`.github/workflows/ci.yml`) with two jobs:

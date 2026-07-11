@@ -10,7 +10,7 @@ Reference implementation in C11 with a Python validation suite.
 ![Language](https://img.shields.io/badge/C-C11-blue.svg)
 ![Build](https://img.shields.io/badge/build-CMake-064F8C.svg?logo=cmake&logoColor=white)
 ![Tests](https://img.shields.io/badge/tests-pytest-0A9EDC.svg?logo=pytest&logoColor=white)
-![Spec](https://img.shields.io/badge/spec-v0.1-lightgrey.svg)
+![Spec](https://img.shields.io/badge/spec-v0.2-lightgrey.svg)
 ![Status](https://img.shields.io/badge/status-experimental-orange.svg)
 ![Security](https://img.shields.io/badge/security-not%20proven-red.svg)
 
@@ -152,7 +152,7 @@ stages:
 flowchart TD
     R["R ∈ F_q⁸"]
     APRE["A_PRE<br>arithmetic pre-mixing, 4 subrounds<br>u = A_PRE_i(R)"]
-    EXP["Expander<br>deterministic blocks v_h = A_ENC_i(u + h·e₀)<br>exact 32-bit rejection sampling"]
+    EXP["Expander<br>tweakable blocks v_h = A_ENC_{i,h}(u)<br>exact 32-bit rejection sampling"]
     FAC["32 signed simple factors of B₈<br>index ∈ {1, …, 40319} by Lehmer code, sign ∈ {+1, −1}"]
     GAR["Left Garside normal form<br>NF(W) = Δᵖ · x₁ ⋯ x_m"]
     DROP["Drop<br>infimum p, length m,<br>cut position, prefix factors"]
@@ -210,21 +210,35 @@ in `B₈`. The implementation computes its **left Garside normal form**
 The normalizer sits behind a function-pointer interface
 (`ctc_braid_normalizer_fn`), so alternative implementations can be injected
 without touching any other module — this is how the cross-implementation
-tests work (see [Testing](#testing)).
+tests work (see [Testing](#testing)). Every injected result is validated before
+FOLD: stored factors must be proper Lehmer ranks 1..40318 and adjacent pairs
+must be left-weighted. This validates canonical representation, not semantic
+equivalence to the input word, so injected normalizers remain trusted
+components.
 
 ### Public constants
 
-Every constant is derived reproducibly from SHAKE256:
+Constants outside the encoder preserve the v0.1 derivation exactly:
 
 ```text
-Seed(label, a, b)  = "CTC-SIGMA|" ‖ label ‖ LE32(a) ‖ LE32(b)
+Seed(label, a, b)  = "CTC-SIGMA-v0.1|" ‖ label ‖ LE32(a) ‖ LE32(b)
 Const(label, a, b) = IntegerLE(SHAKE256(Seed, 16 bytes)) mod q
 ```
 
-SHAKE256 is used only as a public, verifiable number generator; the
-security of CTC-Σ must not depend on it. Distinct labels separate
-initialization vectors, S-box constants, expander, folding, post-mixing,
-hash, and XOF domains. Multiplicative constants are forced non-zero.
+The v0.2 encoder uses a separate, collision-free tweak domain:
+
+```text
+SeedEnc(c,i,h,s,j) = "CTC-SIGMA-v0.2|A_ENC-TWEAK|"
+                     ‖ LEN8(c) ‖ c ‖ LE32(i) ‖ LE32(h)
+                     ‖ LE32(s) ‖ LE32(j)
+ConstEnc(c,i,h,s,j) = IntegerLE(SHAKE256(SeedEnc, 16 bytes)) mod q
+```
+
+Here `c` is one of `RC`, `SBOX-A`, `SBOX-B`, or `SBOX-C`; `i` is the
+Feistel round, `h` the encoder block, `s` the subround, and `j` the lane.
+`SBOX-B` is forced non-zero. The counter is never added or XORed into the
+data state: it selects the constants of `A_ENC_{i,h}`. SHAKE256 is only a
+public, reproducible number generator and is not a secret dependency.
 
 ## Security goals and non-claims
 
@@ -280,11 +294,11 @@ flowchart TD
 |---|---|
 | `field` | Canonical arithmetic over `F_q` (add, sub, mul, pow, inversion, Dickson) |
 | `keccak` | Self-contained Keccak-f[1600] / SHAKE256 for constant derivation |
-| `constants` | Reproducible public constant derivation with domain labels |
-| `arith` | S-boxes, Cauchy MDS matrix and inverse, `ARITH` and inverse |
+| `constants` | Legacy constants plus the v0.2 tweakable `A_ENC` constant domain |
+| `arith` | S-boxes, Cauchy MDS, generic `ARITH`, and tweakable `A_ENC_{i,h}` with inverses |
 | `lehmer` | Canonical rank/unrank of `S₈` permutations (Lehmer code) |
-| `braid` | Simple factors, left Garside normal form, injectable normalizer API |
-| `encoder` | Deterministic expander and bias-free signed-factor sampling |
+| `braid` | Simple factors, left Garside normal form, canonical-form validation, injectable API |
+| `encoder` | Tweakable block generation and bias-free signed-factor sampling |
 | `fold` | Canonical tokenization of the normal form and `FOLD_NF` accumulator |
 | `branch` | The branch function `F_i` (A_PRE → encoder → NF → FOLD → A_POST) |
 | `permutation` | 12-round Feistel permutation PΣ and its inverse |
@@ -357,20 +371,30 @@ The suite covers four layers of assurance:
    left-weighted and to project to the correct `S₈` permutation.
 3. **Pipeline agreement** — Hash256/XOF computed with the injected Python
    normalizer must equal the default C path byte for byte.
-4. **Frozen vectors** — digests and XOF outputs are compared against
-   `test/vectors/ctc_sigma_v01_kat.json`.
+4. **Frozen vectors** — hashes, XOF, permutation, encoder blocks, factor
+   streams, and the encoder constant manifest are compared against the v0.2
+   files in `test/vectors/`.
+5. **Structural regression** — direct tests verify that the v0.1 identity
+   `B_i(u + e₀, h) = B_i(u, h + 1)` is no longer present.
 
 ## Known-answer vectors
 
-`test/vectors/ctc_sigma_v01_kat.json` freezes:
+`test/vectors/ctc_sigma_v02_kat.json` freezes:
 
 - Hash256 digests for message lengths 0, 1, 39, 40, 41, 80, 1024;
 - XOF outputs of 1, 31, 32, 40, 41, 64, 1000 bytes for the empty message
   and a fixed 41-byte message;
-- input/output pairs of the permutation PΣ.
+- input/output pairs of the permutation PΣ;
+- raw `A_ENC_{i,h}` blocks for rounds 0, 3, 7, 11 and blocks 0..4;
+- one complete 32-factor encoder stream and its block count.
 
-Messages follow the documented convention `byte[i] = i mod 256`. Regenerate
-only after an intentional, documented specification change:
+`ctc_sigma_v02_encoder_constants.json` freezes the representative public
+constant manifest and the adjacent `.sha256` file authenticates its exact
+serialization. The old `ctc_sigma_v01_kat.json` remains only as a historical
+snapshot and is intentionally not used by the v0.2 tests.
+
+Messages follow `byte[i] = i mod 256`. Regenerate v0.2 files only after an
+intentional, documented specification change:
 
 ```bash
 python scripts/generate_kat.py
@@ -378,7 +402,10 @@ python scripts/generate_kat.py
 
 ## Project status and roadmap
 
-All modules of the v0.1 specification are implemented and tested; see
+All modules of the revised v0.2 implementation are present and tested. The
+confirmed encoder counter/input alias has been removed by making the block
+index a tweak of all `A_ENC` subround constants, and injected normal forms are
+validated before FOLD. See
 [docs/IMPLEMENTATION_STATUS.md](docs/IMPLEMENTATION_STATUS.md) for the
 per-module table and
 [docs/SPEC_TRACEABILITY.md](docs/SPEC_TRACEABILITY.md) for the

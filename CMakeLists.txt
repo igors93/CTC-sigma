@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(ctc_sigma VERSION 0.1.0 LANGUAGES C)
+project(ctc_sigma VERSION 0.2.0 LANGUAGES C)
 
 option(CTC_SIGMA_BUILD_SHARED "Build the shared library used by Python tests" ON)
 option(CTC_SIGMA_BUILD_TOOLS "Build command-line development tools" ON)

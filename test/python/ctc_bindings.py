@@ -5,7 +5,14 @@ import os
 from pathlib import Path
 
 CTC_STATUS_OK = 0
+CTC_STATUS_INVALID_ARGUMENT = 1
+CTC_STATUS_OUT_OF_RANGE = 2
 CTC_STATUS_NOT_IMPLEMENTED = 6
+
+CTC_ENCODER_CONSTANT_RC = 0
+CTC_ENCODER_CONSTANT_SBOX_A = 1
+CTC_ENCODER_CONSTANT_SBOX_B = 2
+CTC_ENCODER_CONSTANT_SBOX_C = 3
 CTC_FIELD_MODULUS = 2**61 - 1
 CTC_FACTORS_PER_BRANCH = 32
 CTC_MAX_NORMAL_FACTORS = 512
@@ -65,6 +72,9 @@ def _load_library() -> ctypes.CDLL:
 
 lib = _load_library()
 
+lib.ctc_sigma_version.argtypes = []
+lib.ctc_sigma_version.restype = ctypes.c_char_p
+
 lib.ctc_field_add.argtypes = [ctypes.c_uint64, ctypes.c_uint64]
 lib.ctc_field_add.restype = ctypes.c_uint64
 lib.ctc_field_sub.argtypes = [ctypes.c_uint64, ctypes.c_uint64]
@@ -86,6 +96,16 @@ lib.ctc_constant_derive.argtypes = [
 ]
 lib.ctc_constant_derive.restype = ctypes.c_int
 
+lib.ctc_encoder_constant_derive.argtypes = [
+    ctypes.c_int,
+    ctypes.c_uint32,
+    ctypes.c_uint32,
+    ctypes.c_uint32,
+    ctypes.c_uint32,
+    ctypes.POINTER(ctypes.c_uint64),
+]
+lib.ctc_encoder_constant_derive.restype = ctypes.c_int
+
 lib.ctc_arith_apply.argtypes = [
     ctypes.c_char_p,
     ctypes.c_uint32,
@@ -95,6 +115,16 @@ lib.ctc_arith_apply.argtypes = [
 lib.ctc_arith_apply.restype = ctypes.c_int
 lib.ctc_arith_inverse.argtypes = lib.ctc_arith_apply.argtypes
 lib.ctc_arith_inverse.restype = ctypes.c_int
+
+lib.ctc_arith_apply_encoder.argtypes = [
+    ctypes.c_uint32,
+    ctypes.c_uint32,
+    ctypes.POINTER(ctypes.c_uint64),
+    ctypes.c_uint32,
+]
+lib.ctc_arith_apply_encoder.restype = ctypes.c_int
+lib.ctc_arith_inverse_encoder.argtypes = lib.ctc_arith_apply_encoder.argtypes
+lib.ctc_arith_inverse_encoder.restype = ctypes.c_int
 
 lib.ctc_mds_matrix.argtypes = [ctypes.POINTER((ctypes.c_uint64 * 8) * 8)]
 lib.ctc_mds_matrix.restype = ctypes.c_int
@@ -117,6 +147,17 @@ lib.ctc_braid_normalize_left.argtypes = [
 ]
 lib.ctc_braid_normalize_left.restype = ctypes.c_int
 
+lib.ctc_braid_validate_normal_form.argtypes = [ctypes.POINTER(BraidNormalForm)]
+lib.ctc_braid_validate_normal_form.restype = ctypes.c_int
+
+lib.ctc_encoder_generate_block.argtypes = [
+    ctypes.POINTER(ctypes.c_uint64),
+    ctypes.c_uint32,
+    ctypes.c_uint32,
+    ctypes.POINTER(ctypes.c_uint64),
+]
+lib.ctc_encoder_generate_block.restype = ctypes.c_int
+
 lib.ctc_encoder_generate_factors.argtypes = [
     ctypes.POINTER(ctypes.c_uint64),
     ctypes.c_uint32,
@@ -124,6 +165,15 @@ lib.ctc_encoder_generate_factors.argtypes = [
     ctypes.POINTER(ctypes.c_size_t),
 ]
 lib.ctc_encoder_generate_factors.restype = ctypes.c_int
+
+lib.ctc_branch_apply_with_normalizer.argtypes = [
+    ctypes.POINTER(ctypes.c_uint64),
+    ctypes.c_uint32,
+    NORMALIZER_CALLBACK,
+    ctypes.c_void_p,
+    ctypes.POINTER(ctypes.c_uint64),
+]
+lib.ctc_branch_apply_with_normalizer.restype = ctypes.c_int
 
 lib.ctc_fold_tokenize_normal_form.argtypes = [
     ctypes.POINTER(BraidNormalForm),

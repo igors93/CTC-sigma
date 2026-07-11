@@ -24,7 +24,8 @@ def make_normal_form() -> BraidNormalForm:
     normal_form.infimum = -3
     normal_form.factor_count = 20
     for index in range(20):
-        normal_form.factors[index] = index + 1
+        # Repeating rank 1 is a proper left-weighted canonical sequence.
+        normal_form.factors[index] = 1
     return normal_form
 
 
@@ -50,3 +51,15 @@ def test_fold_is_deterministic_and_canonical():
     assert lib.ctc_fold_normal_form(ctypes.byref(normal_form), 7, second) == CTC_STATUS_OK
     assert list(first) == list(second)
     assert all(0 <= value < CTC_FIELD_MODULUS for value in first)
+
+
+def test_fold_rejects_noncanonical_normal_forms():
+    output = (ctypes.c_uint64 * 8)()
+    for invalid_factors in ([0], [40319], [1, 2]):
+        normal_form = BraidNormalForm()
+        normal_form.factor_count = len(invalid_factors)
+        for index, factor in enumerate(invalid_factors):
+            normal_form.factors[index] = factor
+        assert lib.ctc_fold_normal_form(
+            ctypes.byref(normal_form), 0, output
+        ) != CTC_STATUS_OK

@@ -17,10 +17,11 @@ from ctc_bindings import (
 def injected_normalizer(word, word_length, normal_form, _context):
     """Test adapter only: it is not a Garside implementation and is never linked into C."""
     target: BraidNormalForm = normal_form.contents
+    # Return the canonical identity form. This adapter intentionally does not
+    # preserve the input word; it only isolates Feistel/sponge plumbing while
+    # satisfying the production normal-form representation validator.
     target.infimum = 0
-    target.factor_count = word_length
-    for index in range(word_length):
-        target.factors[index] = word[index].simple_index
+    target.factor_count = 0
     return CTC_STATUS_OK
 
 

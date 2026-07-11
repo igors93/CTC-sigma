@@ -122,3 +122,42 @@ def test_rejects_out_of_range_index_and_invalid_sign():
         lib.ctc_braid_normalize_left(factors, 1, ctypes.byref(normal_form), None)
         != CTC_STATUS_OK
     )
+
+
+def make_normal_form(infimum: int, factors: list[int]) -> BraidNormalForm:
+    normal_form = BraidNormalForm()
+    normal_form.infimum = infimum
+    normal_form.factor_count = len(factors)
+    for index, rank in enumerate(factors):
+        normal_form.factors[index] = rank
+    return normal_form
+
+
+def test_normal_form_validator_accepts_canonical_forms():
+    for factors in ([], [1], [1, 1, 1], [40318]):
+        normal_form = make_normal_form(-2, factors)
+        assert lib.ctc_braid_validate_normal_form(
+            ctypes.byref(normal_form)
+        ) == CTC_STATUS_OK
+
+
+def test_normal_form_validator_rejects_identity_delta_and_non_left_weighted_pairs():
+    for invalid_factors in ([0], [DELTA_RANK], [1, 2]):
+        normal_form = make_normal_form(0, invalid_factors)
+        assert lib.ctc_braid_validate_normal_form(
+            ctypes.byref(normal_form)
+        ) != CTC_STATUS_OK
+
+
+def test_normalizer_output_passes_the_public_validator():
+    factors = (SignedFactor * 4)()
+    for index, (rank, sign) in enumerate([(1, 1), (2, -1), (40319, 1), (7, 1)]):
+        factors[index].simple_index = rank
+        factors[index].sign = sign
+    normal_form = BraidNormalForm()
+    assert lib.ctc_braid_normalize_left(
+        factors, 4, ctypes.byref(normal_form), None
+    ) == CTC_STATUS_OK
+    assert lib.ctc_braid_validate_normal_form(
+        ctypes.byref(normal_form)
+    ) == CTC_STATUS_OK

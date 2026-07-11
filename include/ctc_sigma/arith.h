@@ -44,6 +44,26 @@ ctc_status_t ctc_arith_inverse(
     uint32_t subround_count
 );
 
+/*
+ * Apply the CTC-Sigma v0.2 tweakable encoder permutation A_ENC_{i,h}.
+ * The block index selects the constant family and is never injected into the
+ * state. subround_count may be used for trace tests but cannot exceed the
+ * four normative encoder subrounds.
+ */
+ctc_status_t ctc_arith_apply_encoder(
+    uint32_t round_index,
+    uint32_t block_index,
+    uint64_t state[8],
+    uint32_t subround_count
+);
+
+ctc_status_t ctc_arith_inverse_encoder(
+    uint32_t round_index,
+    uint32_t block_index,
+    uint64_t state[8],
+    uint32_t subround_count
+);
+
 #ifdef __cplusplus
 }
 #endif

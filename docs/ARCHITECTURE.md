@@ -1,92 +1,99 @@
-# Architecture
+# Architecture Notes
 
-## Dependency direction
+This document describes implementation choices that are intentionally more
+specific than the mathematical notation in the CTC-Sigma v0.2 specification.
 
-The implementation follows a one-way dependency structure:
+## `constants`
 
-```text
-field ───────────────┐
-keccak -> constants ─┼-> arith -> encoder ─┐
-lehmer -> braid ────────────────────────────┼-> branch -> permutation -> sponge
-                           fold <───────────┘
-```
-
-Lower-level modules do not depend on high-level modes. This makes each mathematical component independently testable and replaceable.
-
-## Public API
-
-Headers under `include/ctc_sigma/` form the supported C interface. Private helpers remain under `src/internal/`.
-
-## Core modules
-
-### `field`
-
-Canonical arithmetic over `F_q`, where `q = 2^61 - 1`. Multiplication uses an unsigned 128-bit intermediate and reduces modulo `q`.
-
-### `constants`
-
-Implements the specification formula:
+Constants outside `A_ENC` preserve the historical v0.1 formula byte for byte:
 
 ```text
 Seed(label, a, b) = ASCII("CTC-SIGMA-v0.1|") || label || LE32(a) || LE32(b)
 Const(label, a, b) = IntegerLE(SHAKE256(Seed, 16 bytes)) mod q
 ```
 
-### `arith`
-
-Contains Dickson/inversion S-boxes, the Cauchy MDS matrix, `ARITH`, and its inverse. The initial implementation uses the following deterministic packing for the two public constant indices:
+The encoder uses a new domain with no packed or truncated indices:
 
 ```text
-a = round_index[15:0] || subround_index[15:0]
-b = lane_index[23:0] || purpose_index[7:0]
+SeedEnc(c,i,h,s,j) = ASCII("CTC-SIGMA-v0.2|A_ENC-TWEAK|")
+                     || LEN8(c) || ASCII(c)
+                     || LE32(i) || LE32(h) || LE32(s) || LE32(j)
+ConstEnc(c,i,h,s,j) = IntegerLE(SHAKE256(SeedEnc, 16 bytes)) mod q
 ```
 
-This mapping is localized in `src/arith.c`, so later constant-table freezing does not affect callers.
+The canonical component identifiers are `RC`, `SBOX-A`, `SBOX-B`, and
+`SBOX-C`. The public API exposes an enum rather than accepting arbitrary
+strings, so unsupported components cannot silently create new domains.
+`SBOX-B` maps zero to one because it is multiplicative.
 
-### `lehmer`
+## `arith`
 
-Canonical lexicographic rank and unrank for permutations of eight symbols. The implementation uses the `0..7` convention internally.
+The arithmetic implementation has one shared forward/inverse core driven by a
+constant-provider callback:
 
-### `encoder`
+- the standard provider preserves `ARITH(label, round, x, rho)` and the v0.1
+  packed-index mapping used by `A_PRE`, `A_FOLD`, and `A_POST`;
+- the encoder provider derives all four lane constants from the complete
+  `(round, block, subround, lane)` tuple.
 
-Implements `v_h = A_ENC_i(u + h·e_0)`, exact 32-bit rejection, sign extraction, and rejection into the 40319 non-identity simple factors.
+This arrangement keeps the S-box, MDS multiplication, degree schedule, and
+inverse logic in one implementation while changing only constant derivation.
+For every fixed `(round, block)`, `A_ENC_{round,block}` remains a permutation.
 
-### `braid`
+## `encoder`
 
-Defines signed factor and normal-form representations and implements the exact
-left Garside normal form for `B_8` over permutation braids:
+The encoder implements:
 
-- a simple element is stored as `map[start_position] = end_position`;
-- a negative factor is rewritten as `x^-1 = Delta^-1 * tau(complement(x))` and
-  the `Delta^-1` is pulled to the front, applying `tau` to earlier factors;
-- adjacent pairs are made left-weighted by transferring
-  `t = meet(complement(a), b)`, where the prefix-lattice meet is computed by
-  greedy extraction of common initial generators;
-- the local rewriting is iterated to a fixed point; `Delta` factors collect at
-  the front (absorbed into the infimum) and identity factors at the back
-  (dropped).
+```text
+v_h = A_ENC_{i,h}(u)
+```
 
-The normalizer stays injectable through `ctc_braid_normalizer_fn` so that
-independent implementations can be swapped in for cross-validation. The test
-suite injects `test/python/garside_reference.py`, an independent atom-transfer
-implementation, and requires identical output.
+The input `u` is copied unchanged before the first subround. The block index is
+never added, multiplied, XORed, or masked into a data lane. This removes the
+v0.1 identity:
 
-### `fold`
+```text
+A_ENC_i((u + e_0) + h*e_0) = A_ENC_i(u + (h+1)*e_0)
+```
 
-Builds tagged tokens for version, Feistel round, ZigZag infimum, canonical length, Drop length, Drop factors, and Keep factors. It then runs the vector `FOLD_NF` accumulator.
+`ctc_encoder_generate_block` is a narrow public primitive used by the factor
+loop, KAT generation, inverse tests, and structural regression tests.
 
-### `branch`
+## `braid` and injected normalizers
 
-Runs `A_PRE`, encoder, braid normalization, `FOLD_NF`, branch constants, and `A_POST`.
+A canonical left normal form stores only proper simple factors:
 
-### `permutation`
+```text
+1 <= factor <= 40318
+```
 
-Implements the twelve-round balanced Feistel permutation and its inverse. A normalizer can be injected for independent implementations and architecture tests.
+Identity rank `0` is omitted and Delta rank `40319` is absorbed into the
+infimum. `ctc_braid_validate_normal_form` also verifies that every adjacent
+pair is left-weighted. The branch validates every injected normalizer result
+before FOLD, and FOLD repeats validation at its own public boundary.
 
-### `sponge`
+This check validates representation only. It cannot prove that an external
+normalizer returned a form equivalent to the signed input word, so injected
+normalizers remain trusted components and must be independently tested.
 
-Implements IV initialization, message-length/domain encoding, padding, 40-byte absorption blocks, and the specified rejection-based squeeze.
+## `lehmer`
 
-## Error handling
+Canonical lexicographic rank and unrank use permutations of symbols `0..7`.
 
-Every fallible public function returns `ctc_status_t`. The first milestone uses `CTC_STATUS_NOT_IMPLEMENTED` specifically for the missing exact Garside normalizer. Safety limits in rejection loops return `CTC_STATUS_REJECTION_LIMIT`.
+## `fold`
+
+The token format and arithmetic are unchanged from v0.1. The version token
+continues to identify token-encoding version 1. The new validation prevents
+identity, Delta, and non-left-weighted lists from entering the token stream.
+
+## `branch`, `permutation`, and `sponge`
+
+The branch order remains:
+
+```text
+A_PRE -> tweakable encoder -> Garside normal form -> FOLD_NF -> A_POST
+```
+
+The twelve-round Feistel construction, message encoding, padding, absorption,
+and rejection-based squeeze are unchanged. Their outputs change because the
+branch function now uses the v0.2 encoder.

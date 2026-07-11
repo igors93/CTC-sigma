@@ -37,3 +37,27 @@ def test_arith_roundtrip():
     assert list(state) != original
     assert lib.ctc_arith_inverse(b"TEST-ARITH", 4, state, 4) == CTC_STATUS_OK
     assert list(state) == original
+
+
+def test_tweakable_encoder_arith_roundtrip_for_multiple_domains():
+    rng = random.Random(0xA3EC02)
+    for round_index in (0, 3, 7, 11):
+        for block_index in (0, 1, 4, 31):
+            original = [rng.randrange(CTC_FIELD_MODULUS) for _ in range(8)]
+            state = u64_array(original)
+
+            assert lib.ctc_arith_apply_encoder(
+                round_index, block_index, state, 4
+            ) == CTC_STATUS_OK
+            assert list(state) != original
+            assert lib.ctc_arith_inverse_encoder(
+                round_index, block_index, state, 4
+            ) == CTC_STATUS_OK
+            assert list(state) == original
+
+
+def test_tweakable_encoder_rejects_non_normative_indices():
+    state = u64_array([0] * 8)
+    assert lib.ctc_arith_apply_encoder(12, 0, state, 4) != CTC_STATUS_OK
+    assert lib.ctc_arith_apply_encoder(0, 1_048_576, state, 4) != CTC_STATUS_OK
+    assert lib.ctc_arith_apply_encoder(0, 0, state, 5) != CTC_STATUS_OK

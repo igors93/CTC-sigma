@@ -18,7 +18,7 @@ typedef struct ctc_signed_factor {
 
 /*
  * Classification produced when a single field lane is decoded by the exact
- * rejection rules from CTC-Sigma v0.1, Section 7.2.
+ * rejection rules from CTC-Sigma v0.2, Section 7.4.
  */
 typedef enum ctc_encoder_candidate_result {
     CTC_ENCODER_CANDIDATE_ACCEPTED = 0,
@@ -37,6 +37,20 @@ ctc_status_t ctc_encoder_decode_candidate(
     uint64_t lane_value,
     ctc_signed_factor_t *factor_out,
     ctc_encoder_candidate_result_t *result_out
+);
+
+/*
+ * Generate one raw encoder block using A_ENC_{round,block}.
+ *
+ * The input is copied unchanged. block_index only selects the tweakable
+ * constant family; it is never added, XORed, or otherwise injected into a
+ * data lane. Input/output aliasing is supported.
+ */
+ctc_status_t ctc_encoder_generate_block(
+    const uint64_t mixed_input[8],
+    uint32_t round_index,
+    uint32_t block_index,
+    uint64_t block_out[8]
 );
 
 ctc_status_t ctc_encoder_generate_factors(

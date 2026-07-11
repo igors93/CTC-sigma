@@ -177,6 +177,50 @@ ctc_status_t ctc_braid_simple_permutation(
     return ctc_lehmer_unrank((uint32_t)simple_index, permutation_out);
 }
 
+ctc_status_t ctc_braid_validate_normal_form(
+    const ctc_braid_normal_form_t *normal_form
+) {
+    ctc_braid_perm_t previous;
+    int has_previous = 0;
+
+    if (normal_form == NULL) {
+        return CTC_STATUS_INVALID_ARGUMENT;
+    }
+    if (normal_form->factor_count > CTC_MAX_NORMAL_FACTORS) {
+        return CTC_STATUS_OUT_OF_RANGE;
+    }
+
+    for (size_t index = 0U; index < normal_form->factor_count; ++index) {
+        const uint32_t rank = (uint32_t)normal_form->factors[index];
+        ctc_braid_perm_t current;
+        ctc_status_t status;
+
+        /* Proper factors exclude both the identity (0) and Delta (40319). */
+        if (rank == 0U || rank >= CTC_NON_IDENTITY_FACTOR_COUNT) {
+            return CTC_STATUS_OUT_OF_RANGE;
+        }
+        status = ctc_lehmer_unrank(rank, current.map);
+        if (status != CTC_STATUS_OK) {
+            return status;
+        }
+
+        if (has_previous != 0) {
+            ctc_braid_perm_t complement;
+            ctc_braid_perm_t transfer;
+
+            ctc_perm_complement(&previous, &complement);
+            ctc_perm_meet(&complement, &current, &transfer);
+            if (ctc_perm_is_identity(&transfer) == 0) {
+                return CTC_STATUS_INVALID_ARGUMENT;
+            }
+        }
+
+        previous = current;
+        has_previous = 1;
+    }
+    return CTC_STATUS_OK;
+}
+
 ctc_status_t ctc_braid_normalize_left(
     const ctc_signed_factor_t *word,
     size_t word_length,
@@ -283,5 +327,7 @@ ctc_status_t ctc_braid_normalize_left(
         }
         normal_form_out->factors[index - leading] = (uint16_t)rank;
     }
-    return CTC_STATUS_OK;
+
+    /* Keep the normalizer's output invariant checked at its public boundary. */
+    return ctc_braid_validate_normal_form(normal_form_out);
 }

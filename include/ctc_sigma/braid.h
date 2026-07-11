@@ -31,6 +31,17 @@ ctc_status_t ctc_braid_simple_permutation(
 );
 
 /*
+ * Validate the canonical representation NF(W) = Delta^p * x_1 * ... * x_m.
+ * Every stored factor must be proper (Lehmer ranks 1..40318), and every
+ * adjacent pair must satisfy the left-weighted condition. This validates the
+ * representation itself; it cannot prove that an injected normalizer
+ * preserved the input braid word.
+ */
+ctc_status_t ctc_braid_validate_normal_form(
+    const ctc_braid_normal_form_t *normal_form
+);
+
+/*
  * Exact left Garside normal form for a word of signed simple factors in B_8:
  * NF(W) = Delta^infimum * x_1 * ... * x_m with proper left-weighted factors.
  * The permutation-braid convention is documented in src/braid.c. The function

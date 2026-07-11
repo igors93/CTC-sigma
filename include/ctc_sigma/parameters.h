@@ -4,7 +4,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#define CTC_SIGMA_VERSION_STRING "0.1.0-dev"
+#define CTC_SIGMA_VERSION_STRING "0.2.0-dev"
 
 #define CTC_FIELD_MODULUS UINT64_C(2305843009213693951)
 #define CTC_BRAID_STRANDS 8U
