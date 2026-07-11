@@ -161,33 +161,33 @@ Repeated calls were checked for byte-identical outputs.
 
 The XOF was also checked for prefix consistency:
 
-\[
+$$
 \operatorname{XOF}(M,n+k)[0:n] = \operatorname{XOF}(M,n)
-\]
+$$
 
 ### Permutation reversibility
 
 For sampled states:
 
-\[
+$$
 P_\Sigma^{-1}(P_\Sigma(X)) = X
-\]
+$$
 
 ### ARITH reversibility
 
 For all configured arithmetic labels and subround counts:
 
-\[
+$$
 \operatorname{ARITH}^{-1}(\operatorname{ARITH}(X)) = X
-\]
+$$
 
 ### Lehmer rank and unrank
 
 The complete space of `8! = 40320` permutations was checked:
 
-\[
+$$
 \operatorname{Rank}(\operatorname{Unrank}(r)) = r
-\]
+$$
 
 ### Garside normalization agreement
 
@@ -198,7 +198,7 @@ The comparison included:
 - infimum;
 - canonical factor count;
 - factor sequence;
-- projection to \(S_8\);
+- projection to $S_8$;
 - proper-factor range.
 
 ### Pipeline with independent normalizer
@@ -359,9 +359,9 @@ Run 2: 50.0361%
 
 Combined mean:
 
-\[
+$$
 50.0015\%
-\]
+$$
 
 No output bit remained significant after false discovery rate correction.
 
@@ -463,7 +463,7 @@ No lane pair repeatedly showed a strong relationship across seeds.
 The experiment included structured inputs such as:
 
 - ascending and descending counters;
-- alternating zero and \(q-1\);
+- alternating zero and $q-1$;
 - equal Feistel halves;
 - powers of two;
 - arithmetic progressions;
@@ -508,9 +508,9 @@ Run 2: 50.0112%
 
 Combined mean:
 
-\[
+$$
 49.9363\%
-\]
+$$
 
 For the reviewed run:
 
@@ -524,13 +524,13 @@ standard deviation: 8.26
 
 For an ideal binomial model:
 
-\[
+$$
 E[X] = 128
-\]
+$$
 
-\[
+$$
 \sigma = 8
-\]
+$$
 
 The observed mean and standard deviation were close to those values.
 
@@ -575,7 +575,7 @@ The observation triggered Phase 1B.
 
 ### Subsequent resolution
 
-Phase 1B later tested this exact pre-registered hypothesis with 20,000 paired one-bit perturbations across ten independent seeds. The bit changed in 9,950 of 20,000 Hash256 comparisons, corresponding to 49.75%, with \(p=0.483905\). The 99.9% Wilson interval included 50%, and the seed directions were split six below and four above 50%.
+Phase 1B later tested this exact pre-registered hypothesis with 20,000 paired one-bit perturbations across ten independent seeds. The bit changed in 9,950 of 20,000 Hash256 comparisons, corresponding to 49.75%, with $p=0.483905$. The 99.9% Wilson interval included 50%, and the seed directions were split six below and four above 50%.
 
 The Phase 1 observation is therefore retained as part of the historical record but is classified as:
 
@@ -599,9 +599,9 @@ Run 2: 50.0793%
 
 Combined mean:
 
-\[
+$$
 50.0000\%
-\]
+$$
 
 No persistent output-bit anomaly comparable to Hash256 bit 159 was observed.
 
@@ -665,9 +665,9 @@ Mean infimum values were:
 
 Combined mean:
 
-\[
+$$
 -12.0248
-\]
+$$
 
 Representative range:
 
@@ -692,9 +692,9 @@ Mean canonical factor counts were:
 
 Combined mean:
 
-\[
+$$
 24.0891
-\]
+$$
 
 Representative distribution:
 
@@ -832,9 +832,9 @@ The bit-159 observation would be classified as confirmed only if all of the foll
 
 1. the combined two-sided test had:
 
-\[
+$$
 p < 0.001
-\]
+$$
 
 2. the 99.9% Wilson confidence interval excluded 50%;
 
@@ -908,9 +908,9 @@ The target output bit changed in:
 
 Therefore:
 
-\[
+$$
 \hat p = 0.4975 = 49.75\%
-\]
+$$
 
 The deviation from 50% was:
 
@@ -1048,9 +1048,9 @@ maximum:            162
 
 For an ideal binomial model with 256 output bits:
 
-\[
+$$
 E[X]=128,\qquad \sigma=8.
-\]
+$$
 
 Both observed distributions were extremely close to those reference values.
 
@@ -1060,7 +1060,7 @@ Both observed distributions were extremely close to those reference values.
 
 The confirmatory target was bit 159. The study also explored all output bits.
 
-After Benjamini-Hochberg correction with \(q=0.01\):
+After Benjamini-Hochberg correction with $q=0.01$:
 
 ```text
 pooled Hash256 and XOF tests: 512
@@ -1120,9 +1120,9 @@ Neighboring classes were:
 
 A conservative Bonferroni threshold for twenty message-length classes at a 5% family-wise level is:
 
-\[
+$$
 0.05/20 = 0.0025.
-\]
+$$
 
 The 40-byte result did not cross that threshold.
 
@@ -1259,19 +1259,19 @@ The working tree was recorded as dirty. The exact research-suite archive and res
 
 The production modulus was recorded as:
 
-\[
+$$
 q=2^{61}-1=2305843009213693951.
-\]
+$$
 
 The implementation reported it as probably prime, and the permutation criteria for both selected Dickson degrees were satisfied:
 
-\[
+$$
 \gcd(23,q^2-1)=1,
 \qquad
 \gcd(47,q^2-1)=1.
-\]
+$$
 
-In the reduced exhaustive field \(\mathbb F_{1279}\), both maps produced all 1,279 possible outputs exactly once.
+In the reduced exhaustive field $\mathbb F_{1279}$, both maps produced all 1,279 possible outputs exactly once.
 
 No failure was recorded.
 
@@ -1281,9 +1281,9 @@ For both degrees, all 2,558 tested reduced-field inputs satisfied the expected S
 
 The exact relation
 
-\[
+$$
 S(-2C-x)=2A-S(x)
-\]
+$$
 
 held across the complete tested reduced field.
 
@@ -1293,7 +1293,7 @@ No zero-derivative point was observed in the exhaustive reduced-field test.
 
 ### MDS verification
 
-The complete set of square minors of the \(8\times8\) reduced-field matrix was checked:
+The complete set of square minors of the $8\times8$ reduced-field matrix was checked:
 
 ```text
 1×1 minors:  64
@@ -1326,17 +1326,17 @@ This result did not reveal a sampled local algebraic degeneracy. It remains an e
 
 The differential distribution tables were computed exhaustively over:
 
-\[
+$$
 \mathbb F_{1279}.
-\]
+$$
 
 The results were:
 
 | Function | Differential uniformity | Maximum probability |
 |---|---:|---:|
-| Dickson degree 23 S-box core | 14 | \(14/1279\approx1.0946\%\) |
-| Dickson degree 47 S-box core | 12 | \(12/1279\approx0.9382\%\) |
-| Random permutation controls | 9, 10, 9 | maximum \(10/1279\approx0.7819\%\) |
+| Dickson degree 23 S-box core | 14 | $14/1279\approx1.0946\%$ |
+| Dickson degree 47 S-box core | 12 | $12/1279\approx0.9382\%$ |
+| Random permutation controls | 9, 10, 9 | maximum $10/1279\approx0.7819\%$ |
 
 For degree 23, the maximum count 14 occurred for at least the following differential pairs:
 
@@ -1361,7 +1361,7 @@ Structured differential behavior requiring confirmation and propagation analysis
 
 Required follow-up work includes:
 
-- repeat the exhaustive experiment over \(\mathbb F_{8191}\);
+- repeat the exhaustive experiment over $\mathbb F_{8191}$;
 - increase the random-permutation baseline;
 - propagate the strongest differentials through one and multiple ARITH subrounds;
 - measure active S-box counts under the MDS layer;
@@ -1393,7 +1393,7 @@ degree 2 candidate dimension: 0
 The following structured families were each tested for all 127 configured values:
 
 - all lanes equal;
-- alternating \(x,-x\);
+- alternating $x,-x$;
 - arithmetic progression;
 - palindrome;
 - only lane 0 nonzero.
@@ -1435,9 +1435,9 @@ The encoder experiment evaluated 32 samples. Every sample generated exactly four
 
 Observed sensitivity under:
 
-\[
+$$
 u\mapsto u+e_0
-\]
+$$
 
 was:
 
@@ -1586,7 +1586,7 @@ The production-permutation KAT was also disabled. Therefore:
 - No tested linear or quadratic invariant was found.
 - No tested structured subspace was preserved.
 - No simple Mersenne rotation, scaling, or negation relation was found.
-- The encoder changed all 32 factors under the tested \(u+e_0\) perturbation.
+- The encoder changed all 32 factors under the tested $u+e_0$ perturbation.
 - No braid-relation, projection, or sampled normal-form collision failure occurred.
 - The arithmetic/Feistel construction reached near-ideal avalanche by round 3 without braids.
 - A machine-readable polynomial model was successfully exported.
@@ -1597,7 +1597,7 @@ The production-permutation KAT was also disabled. Therefore:
    This is mathematically expected but may support structured attacks if it propagates.
 
 2. **Differential uniformity above the sampled random baseline**  
-   Uniformities 14 and 12 were observed in \(\mathbb F_{1279}\), versus a sampled random maximum of 10.
+   Uniformities 14 and 12 were observed in $\mathbb F_{1279}$, versus a sampled random maximum of 10.
 
 3. **Encoder related-position sign correlation**  
    A maximum absolute correlation of 0.410720 was observed, but the sample size and multiple comparisons prevent a reliable conclusion.
@@ -1774,7 +1774,7 @@ The study used:
    Replace one lane by its additive inverse.
 
 5. `balanced_two_lane_delta`  
-   Add \(+\delta\) to one lane and \(-\delta\) to another lane.
+   Add $+\delta$ to one lane and $-\delta$ to another lane.
 
 6. `mirrored_half_delta`  
    Apply the same delta to corresponding lanes in the two Feistel halves.
@@ -1784,23 +1784,23 @@ The study used:
 The study tested whether the production permutation retained or commuted with:
 
 1. full-state negation;
-2. multiplication of every lane by \(2\);
-3. multiplication of every lane by \(2^{13}\);
+2. multiplication of every lane by $2$;
+3. multiplication of every lane by $2^{13}$;
 4. swapping the two Feistel halves;
 5. reversing lane order;
 6. rotating lanes left by one position.
 
-For a transformation \(T\), two quantities were measured:
+For a transformation $T$, two quantities were measured:
 
-\[
+$$
 P(x)\oplus P(T(x))
-\]
+$$
 
 and the commutation residual:
 
-\[
+$$
 P(T(x))\oplus T(P(x)).
-\]
+$$
 
 An exact zero residual would indicate exact commutation for that tested state.
 
@@ -1865,21 +1865,21 @@ No tested transformation commuted exactly with the final production permutation.
 
 Within the tested states, this rejects simple universal relations of the forms:
 
-\[
+$$
 P(-x)=-P(x),
-\]
+$$
 
-\[
+$$
 P(2x)=2P(x),
-\]
+$$
 
 and:
 
-\[
+$$
 P(\operatorname{swap}(x))
 =
 \operatorname{swap}(P(x)).
-\]
+$$
 
 Several transformations retained visible partial structure in the first round, but their final output differences and final commutation residuals were near 50%.
 
@@ -1895,15 +1895,15 @@ The valid encoded state contains:
 
 For an ideal independent bit model, the expected Hamming distance is:
 
-\[
+$$
 976/2=488
-\]
+$$
 
 with ideal binomial standard deviation:
 
-\[
+$$
 \sqrt{976\cdot0.5\cdot0.5}\approx15.6205.
-\]
+$$
 
 Across the eighteen final metrics—six local outputs, six symmetry output differences, and six symmetry commutation residuals—the observed values were:
 
@@ -2024,9 +2024,9 @@ This battery did not directly test:
 - the reduced-field uniformity values 14 and 12 from Phase 2A;
 - formal propagation probabilities for the strongest S-box differentials;
 - the exact central S-box relation:
-  \[
+  $$
   S(-2C-x)=2A-S(x);
-  \]
+  $$
 - encoder related-input correlations;
 - full versus no-braid attack resistance;
 - the security contribution of Garside normalization;
@@ -2186,7 +2186,7 @@ The evidence does **not** support statements such as:
 
 ## Algebraic and differential confirmation
 
-1. Repeat the S-box DDT experiment over \(\mathbb F_{8191}\).
+1. Repeat the S-box DDT experiment over $\mathbb F_{8191}$.
 2. Increase the random-permutation comparison baseline substantially.
 3. Propagate the highest-probability S-box differentials through:
    - one ARITH subround;
@@ -2217,7 +2217,7 @@ The evidence does **not** support statements such as:
 3. Record confidence intervals for each position pair.
 4. Apply false-discovery-rate or family-wise-error correction.
 5. Analyze mutual information and non-linear dependence in addition to Pearson correlation.
-6. Compare the related inputs \(u+h e_0\) for larger \(h\) ranges.
+6. Compare the related inputs $u+h e_0$ for larger $h$ ranges.
 
 ## Braid-layer contribution
 
@@ -2319,7 +2319,7 @@ Updated:
 - the current security interpretation;
 - immediate research priorities and the Phase 1B disposition.
 
-The completed Phase 1B study used ten independent seeds and 2,000 paired one-bit perturbations per seed. Hash256 output bit 159 changed in 9,950 of 20,000 comparisons, or 49.75%, with \(p=0.483905\). The 99.9% Wilson interval included 50%, and the seed directions were not consistent. No pre-registered confirmation criterion was met.
+The completed Phase 1B study used ten independent seeds and 2,000 paired one-bit perturbations per seed. Hash256 output bit 159 changed in 9,950 of 20,000 comparisons, or 49.75%, with $p=0.483905$. The 99.9% Wilson interval included 50%, and the seed directions were not consistent. No pre-registered confirmation criterion was met.
 
 The original Phase 1 observation remains preserved as historical evidence but is classified as a non-reproduced statistical fluctuation.
 
