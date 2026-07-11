@@ -162,7 +162,7 @@ Repeated calls were checked for byte-identical outputs.
 The XOF was also checked for prefix consistency:
 
 $$
-\operatorname{XOF}(M,n+k)[0:n] = \operatorname{XOF}(M,n)
+\mathrm{XOF}(M,n+k)[0:n] = \mathrm{XOF}(M,n)
 $$
 
 ### Permutation reversibility
@@ -178,7 +178,7 @@ $$
 For all configured arithmetic labels and subround counts:
 
 $$
-\operatorname{ARITH}^{-1}(\operatorname{ARITH}(X)) = X
+\mathrm{ARITH}^{-1}(\mathrm{ARITH}(X)) = X
 $$
 
 ### Lehmer rank and unrank
@@ -186,7 +186,7 @@ $$
 The complete space of `8! = 40320` permutations was checked:
 
 $$
-\operatorname{Rank}(\operatorname{Unrank}(r)) = r
+\mathrm{Rank}(\mathrm{Unrank}(r)) = r
 $$
 
 ### Garside normalization agreement
@@ -1876,9 +1876,9 @@ $$
 and:
 
 $$
-P(\operatorname{swap}(x))
+P(\mathrm{swap}(x))
 =
-\operatorname{swap}(P(x)).
+\mathrm{swap}(P(x)).
 $$
 
 Several transformations retained visible partial structure in the first round, but their final output differences and final commutation residuals were near 50%.
