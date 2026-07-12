@@ -9,12 +9,6 @@
 extern "C" {
 #endif
 
-/*
- * Components of the CTC-Sigma v0.2 tweakable encoder constant domain.
- *
- * The numeric values are API identifiers only. The normative seed encodes the
- * canonical ASCII names "RC", "SBOX-A", "SBOX-B", and "SBOX-C".
- */
 typedef enum ctc_encoder_constant_component {
     CTC_ENCODER_CONSTANT_RC = 0,
     CTC_ENCODER_CONSTANT_SBOX_A = 1,
@@ -22,6 +16,25 @@ typedef enum ctc_encoder_constant_component {
     CTC_ENCODER_CONSTANT_SBOX_C = 3
 } ctc_encoder_constant_component_t;
 
+typedef enum ctc_v03_constant_purpose {
+    CTC_V03_CONSTANT_GENERIC = 0,
+    CTC_V03_CONSTANT_ROUND = 1,
+    CTC_V03_CONSTANT_SBOX_A = 2,
+    CTC_V03_CONSTANT_SBOX_B = 3,
+    CTC_V03_CONSTANT_SBOX_C = 4,
+    CTC_V03_CONSTANT_DESCRIPTOR_IV = 5,
+    CTC_V03_CONSTANT_DESCRIPTOR_GROUP = 6,
+    CTC_V03_CONSTANT_DYNAMIC_RC = 7,
+    CTC_V03_CONSTANT_DYNAMIC_A = 8,
+    CTC_V03_CONSTANT_DYNAMIC_B = 9,
+    CTC_V03_CONSTANT_DYNAMIC_C = 10,
+    CTC_V03_CONSTANT_SPONGE_IV = 11
+} ctc_v03_constant_purpose_t;
+
+/*
+ * Compatibility entry point backed by the lossless v0.3 seed encoding.
+ * first_index and second_index are serialized independently as LE32 values.
+ */
 ctc_status_t ctc_constant_derive(
     const char *label,
     uint32_t first_index,
@@ -37,16 +50,32 @@ ctc_status_t ctc_constant_derive_nonzero(
 );
 
 /*
- * Derive one public constant for A_ENC_{round,block}.
+ * Lossless CTC-Sigma v0.3 public constant domain.
  *
- * SeedEnc(c,i,h,s,j) =
- *   ASCII("CTC-SIGMA-v0.2|A_ENC-TWEAK|") || LEN8(c) || ASCII(c)
- *   || LE32(i) || LE32(h) || LE32(s) || LE32(j)
- *
- * SBOX-B is a multiplicative constant and is therefore mapped from zero to
- * one. All indices are range-checked before serialization; no truncation is
- * permitted in this domain.
+ * Seed = "CTC-SIGMA-v0.3|CONST|" || LEN8(component) || component
+ *        || LE32(purpose) || LE32(round) || LE32(subround)
+ *        || LE32(lane) || LE32(block)
  */
+ctc_status_t ctc_v03_constant_derive(
+    const char *component,
+    ctc_v03_constant_purpose_t purpose,
+    uint32_t round_index,
+    uint32_t subround_index,
+    uint32_t lane_index,
+    uint32_t block_index,
+    uint64_t *constant_out
+);
+
+/* Derive all eight lane constants with one SHAKE256 invocation. */
+ctc_status_t ctc_v03_constant_derive_lanes(
+    const char *component,
+    ctc_v03_constant_purpose_t purpose,
+    uint32_t round_index,
+    uint32_t subround_index,
+    uint32_t block_index,
+    uint64_t constants_out[8]
+);
+
 ctc_status_t ctc_encoder_constant_derive(
     ctc_encoder_constant_component_t component,
     uint32_t round_index,

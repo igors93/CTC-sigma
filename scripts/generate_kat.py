@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate frozen known-answer vectors for CTC-Sigma v0.2.
+"""Generate frozen known-answer vectors for CTC-Sigma v0.3.
 
 Message convention: a message of length n consists of bytes 0, 1, ...,
 (n-1) modulo 256. The fixed XOF message is the 41-byte instance of the same
@@ -145,11 +145,11 @@ def build_encoder_constant_manifest() -> dict:
                             }
                         )
     return {
-        "version": "CTC-Sigma v0.2",
-        "domain": "CTC-SIGMA-v0.2|A_ENC-TWEAK|",
+        "version": "CTC-Sigma v0.3",
+        "domain": "CTC-SIGMA-v0.3|CONST|",
         "seed_format": (
-            "prefix || LEN8(component) || component || LE32(round) || "
-            "LE32(block) || LE32(subround) || LE32(lane)"
+            "prefix || LEN8(A_ENC) || A_ENC || LE32(purpose) || "
+            "LE32(round) || LE32(subround) || LE32(lane) || LE32(block)"
         ),
         "rounds": ENCODER_VECTOR_ROUNDS,
         "blocks": ENCODER_VECTOR_BLOCKS,
@@ -167,7 +167,7 @@ def write_json(path: Path, payload: dict) -> bytes:
 
 def main() -> None:
     vectors = {
-        "version": "CTC-Sigma v0.2",
+        "version": "CTC-Sigma v0.3",
         "message_convention": "byte[i] = i mod 256",
         "hash256": {
             str(length): hash256(pattern_message(length)).hex()
@@ -203,9 +203,9 @@ def main() -> None:
     }
 
     vector_directory = REPOSITORY_ROOT / "test" / "vectors"
-    kat_path = vector_directory / "ctc_sigma_v02_kat.json"
-    manifest_path = vector_directory / "ctc_sigma_v02_encoder_constants.json"
-    checksum_path = vector_directory / "ctc_sigma_v02_encoder_constants.sha256"
+    kat_path = vector_directory / "ctc_sigma_v03_kat.json"
+    manifest_path = vector_directory / "ctc_sigma_v03_encoder_constants.json"
+    checksum_path = vector_directory / "ctc_sigma_v03_encoder_constants.sha256"
 
     write_json(kat_path, vectors)
     manifest_bytes = write_json(manifest_path, build_encoder_constant_manifest())

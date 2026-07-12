@@ -85,7 +85,7 @@ ctc_status_t ctc_fold_tokenize_normal_form(
         return status;
     }
 
-    status = ctc_append_token(tokens_out, CTC_TOKEN_VERSION, 1U);
+    status = ctc_append_token(tokens_out, CTC_TOKEN_VERSION, 3U);
     if (status != CTC_STATUS_OK) {
         return status;
     }

@@ -14,7 +14,10 @@ CTC_ENCODER_CONSTANT_SBOX_A = 1
 CTC_ENCODER_CONSTANT_SBOX_B = 2
 CTC_ENCODER_CONSTANT_SBOX_C = 3
 CTC_FIELD_MODULUS = 2**61 - 1
-CTC_FACTORS_PER_BRANCH = 32
+CTC_FACTORS_PER_BRANCH = 24
+CTC_RATE_BYTES = 35
+CTC_RATE_LANES = 7
+CTC_CAPACITY_LANES = 9
 CTC_MAX_NORMAL_FACTORS = 512
 CTC_MAX_FOLD_TOKENS = CTC_MAX_NORMAL_FACTORS + 8
 
@@ -31,6 +34,25 @@ class BraidNormalForm(ctypes.Structure):
         ("infimum", ctypes.c_int64),
         ("factor_count", ctypes.c_size_t),
         ("factors", ctypes.c_uint16 * CTC_MAX_NORMAL_FACTORS),
+    ]
+
+
+class BraidDescriptor(ctypes.Structure):
+    _fields_ = [
+        ("lanes", ctypes.c_uint64 * 8),
+        ("token_count", ctypes.c_size_t),
+        ("prefix_factor_count", ctypes.c_size_t),
+    ]
+
+
+class DynamicArithConfig(ctypes.Structure):
+    _fields_ = [
+        ("round_constants", (ctypes.c_uint64 * 8) * 4),
+        ("sbox_a", (ctypes.c_uint64 * 8) * 4),
+        ("sbox_b", (ctypes.c_uint64 * 8) * 4),
+        ("sbox_c", (ctypes.c_uint64 * 8) * 4),
+        ("lane_permutation", ctypes.c_uint8 * 8),
+        ("degrees", ctypes.c_uint8 * 4),
     ]
 
 
@@ -106,6 +128,17 @@ lib.ctc_encoder_constant_derive.argtypes = [
 ]
 lib.ctc_encoder_constant_derive.restype = ctypes.c_int
 
+lib.ctc_v03_constant_derive.argtypes = [
+    ctypes.c_char_p,
+    ctypes.c_int,
+    ctypes.c_uint32,
+    ctypes.c_uint32,
+    ctypes.c_uint32,
+    ctypes.c_uint32,
+    ctypes.POINTER(ctypes.c_uint64),
+]
+lib.ctc_v03_constant_derive.restype = ctypes.c_int
+
 lib.ctc_arith_apply.argtypes = [
     ctypes.c_char_p,
     ctypes.c_uint32,
@@ -166,6 +199,13 @@ lib.ctc_encoder_generate_factors.argtypes = [
 ]
 lib.ctc_encoder_generate_factors.restype = ctypes.c_int
 
+lib.ctc_branch_apply.argtypes = [
+    ctypes.POINTER(ctypes.c_uint64),
+    ctypes.c_uint32,
+    ctypes.POINTER(ctypes.c_uint64),
+]
+lib.ctc_branch_apply.restype = ctypes.c_int
+
 lib.ctc_branch_apply_with_normalizer.argtypes = [
     ctypes.POINTER(ctypes.c_uint64),
     ctypes.c_uint32,
@@ -174,6 +214,16 @@ lib.ctc_branch_apply_with_normalizer.argtypes = [
     ctypes.POINTER(ctypes.c_uint64),
 ]
 lib.ctc_branch_apply_with_normalizer.restype = ctypes.c_int
+
+lib.ctc_branch_apply_variant.argtypes = [
+    ctypes.POINTER(ctypes.c_uint64),
+    ctypes.c_uint32,
+    ctypes.c_int,
+    NORMALIZER_CALLBACK,
+    ctypes.c_void_p,
+    ctypes.POINTER(ctypes.c_uint64),
+]
+lib.ctc_branch_apply_variant.restype = ctypes.c_int
 
 lib.ctc_fold_tokenize_normal_form.argtypes = [
     ctypes.POINTER(BraidNormalForm),
@@ -188,6 +238,30 @@ lib.ctc_fold_normal_form.argtypes = [
 ]
 lib.ctc_fold_normal_form.restype = ctypes.c_int
 
+lib.ctc_braid_descriptor_build.argtypes = [
+    ctypes.POINTER(BraidNormalForm),
+    ctypes.c_uint32,
+    ctypes.POINTER(BraidDescriptor),
+]
+lib.ctc_braid_descriptor_build.restype = ctypes.c_int
+lib.ctc_dynamic_arith_config_build.argtypes = [
+    ctypes.POINTER(BraidDescriptor),
+    ctypes.c_uint32,
+    ctypes.POINTER(DynamicArithConfig),
+]
+lib.ctc_dynamic_arith_config_build.restype = ctypes.c_int
+lib.ctc_dynamic_arith_inject_descriptor.argtypes = [
+    ctypes.POINTER(ctypes.c_uint64),
+    ctypes.POINTER(BraidDescriptor),
+    ctypes.POINTER(ctypes.c_uint64),
+]
+lib.ctc_dynamic_arith_inject_descriptor.restype = ctypes.c_int
+lib.ctc_dynamic_arith_apply.argtypes = [
+    ctypes.POINTER(ctypes.c_uint64),
+    ctypes.POINTER(DynamicArithConfig),
+]
+lib.ctc_dynamic_arith_apply.restype = ctypes.c_int
+
 lib.ctc_sponge_initialize.argtypes = [ctypes.POINTER(Sponge), ctypes.c_int]
 lib.ctc_sponge_initialize.restype = ctypes.c_int
 lib.ctc_sponge_encode_message.argtypes = [
@@ -200,6 +274,17 @@ lib.ctc_sponge_encode_message.argtypes = [
 lib.ctc_sponge_encode_message.restype = ctypes.c_int
 lib.ctc_sponge_free_encoded_message.argtypes = [ctypes.POINTER(ctypes.c_uint8)]
 lib.ctc_sponge_free_encoded_message.restype = None
+
+lib.ctc_round_schedule_get.argtypes = [
+    ctypes.c_uint32,
+    ctypes.POINTER(ctypes.c_int),
+]
+lib.ctc_round_schedule_get.restype = ctypes.c_int
+lib.ctc_validate_canonical_lanes.argtypes = [
+    ctypes.POINTER(ctypes.c_uint64),
+    ctypes.c_size_t,
+]
+lib.ctc_validate_canonical_lanes.restype = ctypes.c_int
 
 lib.ctc_permutation_apply.argtypes = [ctypes.POINTER(ctypes.c_uint64)]
 lib.ctc_permutation_apply.restype = ctypes.c_int

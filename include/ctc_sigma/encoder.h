@@ -18,7 +18,7 @@ typedef struct ctc_signed_factor {
 
 /*
  * Classification produced when a single field lane is decoded by the exact
- * rejection rules from CTC-Sigma v0.2, Section 7.4.
+ * rejection rules from CTC-Sigma v0.3, Section 7.4.
  */
 typedef enum ctc_encoder_candidate_result {
     CTC_ENCODER_CANDIDATE_ACCEPTED = 0,

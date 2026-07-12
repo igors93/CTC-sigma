@@ -6,6 +6,7 @@
 #include "ctc_sigma/branch.h"
 #include "ctc_sigma/field.h"
 #include "ctc_sigma/parameters.h"
+#include "ctc_sigma/validation.h"
 
 ctc_status_t ctc_permutation_apply_with_normalizer(
     uint64_t state[16],
@@ -17,6 +18,15 @@ ctc_status_t ctc_permutation_apply_with_normalizer(
 
     if (state == NULL || normalizer == NULL) {
         return CTC_STATUS_INVALID_ARGUMENT;
+    }
+    {
+        const ctc_status_t validation_status = ctc_validate_canonical_lanes(
+            state,
+            CTC_STATE_LANES
+        );
+        if (validation_status != CTC_STATUS_OK) {
+            return validation_status;
+        }
     }
 
     memcpy(left, state, sizeof(left));
@@ -58,6 +68,15 @@ ctc_status_t ctc_permutation_inverse_with_normalizer(
 
     if (state == NULL || normalizer == NULL) {
         return CTC_STATUS_INVALID_ARGUMENT;
+    }
+    {
+        const ctc_status_t validation_status = ctc_validate_canonical_lanes(
+            state,
+            CTC_STATE_LANES
+        );
+        if (validation_status != CTC_STATUS_OK) {
+            return validation_status;
+        }
     }
 
     memcpy(left, state, sizeof(left));

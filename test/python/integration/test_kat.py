@@ -22,9 +22,9 @@ from ctc_bindings import (
 )
 
 VECTOR_DIRECTORY = Path(__file__).resolve().parents[3] / "test" / "vectors"
-VECTOR_PATH = VECTOR_DIRECTORY / "ctc_sigma_v02_kat.json"
-MANIFEST_PATH = VECTOR_DIRECTORY / "ctc_sigma_v02_encoder_constants.json"
-MANIFEST_HASH_PATH = VECTOR_DIRECTORY / "ctc_sigma_v02_encoder_constants.sha256"
+VECTOR_PATH = VECTOR_DIRECTORY / "ctc_sigma_v03_kat.json"
+MANIFEST_PATH = VECTOR_DIRECTORY / "ctc_sigma_v03_encoder_constants.json"
+MANIFEST_HASH_PATH = VECTOR_DIRECTORY / "ctc_sigma_v03_encoder_constants.sha256"
 COMPONENT_IDS = {
     "RC": CTC_ENCODER_CONSTANT_RC,
     "SBOX-A": CTC_ENCODER_CONSTANT_SBOX_A,
@@ -34,15 +34,22 @@ COMPONENT_IDS = {
 
 
 def derive_manifest_value_python(record: dict) -> int:
-    component = record["component"].encode("ascii")
+    purpose = {
+        "RC": 1,
+        "SBOX-A": 2,
+        "SBOX-B": 3,
+        "SBOX-C": 4,
+    }[record["component"]]
+    component = b"A_ENC"
     seed = (
-        b"CTC-SIGMA-v0.2|A_ENC-TWEAK|"
+        b"CTC-SIGMA-v0.3|CONST|"
         + bytes([len(component)])
         + component
+        + purpose.to_bytes(4, "little")
         + record["round"].to_bytes(4, "little")
-        + record["block"].to_bytes(4, "little")
         + record["subround"].to_bytes(4, "little")
         + record["lane"].to_bytes(4, "little")
+        + record["block"].to_bytes(4, "little")
     )
     value = int.from_bytes(hashlib.shake_256(seed).digest(16), "little") % (2**61 - 1)
     return 1 if record["component"] == "SBOX-B" and value == 0 else value
@@ -58,7 +65,7 @@ def vectors() -> dict:
 
 
 def test_vector_version(vectors):
-    assert vectors["version"] == "CTC-Sigma v0.2"
+    assert vectors["version"] == "CTC-Sigma v0.3"
 
 
 def test_hash256_known_answers(vectors):

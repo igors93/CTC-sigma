@@ -15,20 +15,24 @@ from ctc_bindings import (
     lib,
 )
 
-ENCODER_COMPONENT_NAMES = {
-    CTC_ENCODER_CONSTANT_RC: b"RC",
-    CTC_ENCODER_CONSTANT_SBOX_A: b"SBOX-A",
-    CTC_ENCODER_CONSTANT_SBOX_B: b"SBOX-B",
-    CTC_ENCODER_CONSTANT_SBOX_C: b"SBOX-C",
+ENCODER_COMPONENT_PURPOSES = {
+    CTC_ENCODER_CONSTANT_RC: 1,
+    CTC_ENCODER_CONSTANT_SBOX_A: 2,
+    CTC_ENCODER_CONSTANT_SBOX_B: 3,
+    CTC_ENCODER_CONSTANT_SBOX_C: 4,
 }
 
 
 def derive_python(label: bytes, first_index: int, second_index: int) -> int:
     seed = (
-        b"CTC-SIGMA-v0.1|"
+        b"CTC-SIGMA-v0.3|CONST|"
+        + bytes([len(label)])
         + label
+        + (0).to_bytes(4, "little")
         + first_index.to_bytes(4, "little")
         + second_index.to_bytes(4, "little")
+        + (0).to_bytes(4, "little")
+        + (0).to_bytes(4, "little")
     )
     return int.from_bytes(hashlib.shake_256(seed).digest(16), "little") % CTC_FIELD_MODULUS
 
@@ -40,15 +44,16 @@ def derive_encoder_python(
     subround_index: int,
     lane_index: int,
 ) -> int:
-    component_name = ENCODER_COMPONENT_NAMES[component]
+    component_name = b"A_ENC"
     seed = (
-        b"CTC-SIGMA-v0.2|A_ENC-TWEAK|"
+        b"CTC-SIGMA-v0.3|CONST|"
         + bytes([len(component_name)])
         + component_name
+        + ENCODER_COMPONENT_PURPOSES[component].to_bytes(4, "little")
         + round_index.to_bytes(4, "little")
-        + block_index.to_bytes(4, "little")
         + subround_index.to_bytes(4, "little")
         + lane_index.to_bytes(4, "little")
+        + block_index.to_bytes(4, "little")
     )
     value = int.from_bytes(hashlib.shake_256(seed).digest(16), "little") % CTC_FIELD_MODULUS
     return 1 if component == CTC_ENCODER_CONSTANT_SBOX_B and value == 0 else value
@@ -88,7 +93,7 @@ def test_public_constant_derivation_matches_python_shake256():
 
 
 def test_encoder_constant_derivation_matches_normative_python_encoding():
-    for component in ENCODER_COMPONENT_NAMES:
+    for component in ENCODER_COMPONENT_PURPOSES:
         for round_index, block_index, subround_index, lane_index in [
             (0, 0, 0, 0),
             (3, 1, 2, 7),
@@ -113,11 +118,11 @@ def test_encoder_constant_derivation_matches_normative_python_encoding():
 def test_encoder_constants_are_domain_separated_by_block_and_component():
     values_by_component = {
         component: derive_encoder_c(component, 3, 0, 2, 5)
-        for component in ENCODER_COMPONENT_NAMES
+        for component in ENCODER_COMPONENT_PURPOSES
     }
     assert len(set(values_by_component.values())) == len(values_by_component)
 
-    for component in ENCODER_COMPONENT_NAMES:
+    for component in ENCODER_COMPONENT_PURPOSES:
         block_values = {
             derive_encoder_c(component, 3, block_index, 2, 5)
             for block_index in range(5)
@@ -144,5 +149,5 @@ def test_encoder_constant_derivation_rejects_invalid_domain_fields():
     ) == CTC_STATUS_OUT_OF_RANGE
 
 
-def test_reported_version_is_v02_development_line():
-    assert lib.ctc_sigma_version().decode("ascii") == "0.2.0-dev"
+def test_reported_version_is_v03_development_line():
+    assert lib.ctc_sigma_version().decode("ascii") == "0.3.0-dev"

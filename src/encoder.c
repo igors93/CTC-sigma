@@ -6,6 +6,7 @@
 
 #include "ctc_sigma/arith.h"
 #include "ctc_sigma/parameters.h"
+#include "ctc_sigma/validation.h"
 
 ctc_status_t ctc_encoder_decode_candidate(
     uint64_t lane_value,
@@ -67,9 +68,13 @@ ctc_status_t ctc_encoder_generate_block(
         || block_index >= CTC_ENCODER_MAX_BLOCKS) {
         return CTC_STATUS_OUT_OF_RANGE;
     }
+    status = ctc_validate_canonical_lanes(mixed_input, CTC_BRANCH_LANES);
+    if (status != CTC_STATUS_OK) {
+        return status;
+    }
 
     /*
-     * CTC-Sigma v0.2 domain-separates the block in A_ENC's constants. The
+     * CTC-Sigma v0.3 domain-separates the block in A_ENC's constants. The
      * data vector must remain byte-for-byte unchanged before the first
      * nonlinear subround, otherwise input/counter aliasing can reappear.
      */
@@ -94,7 +99,10 @@ ctc_status_t ctc_encoder_generate_factors(
     ctc_signed_factor_t factors_out[CTC_FACTORS_PER_BRANCH],
     size_t *generated_block_count_out
 ) {
+    ctc_signed_factor_t generated_factors[CTC_FACTORS_PER_BRANCH];
     size_t generated = 0U;
+    size_t generated_block_count = 0U;
+    ctc_status_t status;
 
     if (mixed_input == NULL || factors_out == NULL) {
         return CTC_STATUS_INVALID_ARGUMENT;
@@ -102,23 +110,23 @@ ctc_status_t ctc_encoder_generate_factors(
     if (round_index >= CTC_FEISTEL_ROUNDS) {
         return CTC_STATUS_OUT_OF_RANGE;
     }
-
-    memset(factors_out, 0, sizeof(*factors_out) * CTC_FACTORS_PER_BRANCH);
-    if (generated_block_count_out != NULL) {
-        *generated_block_count_out = 0U;
+    status = ctc_validate_canonical_lanes(mixed_input, CTC_BRANCH_LANES);
+    if (status != CTC_STATUS_OK) {
+        return status;
     }
 
+    memset(generated_factors, 0, sizeof(generated_factors));
     for (uint32_t block_index = 0U;
          block_index < CTC_ENCODER_MAX_BLOCKS && generated < CTC_FACTORS_PER_BRANCH;
          ++block_index) {
         uint64_t block[CTC_BRANCH_LANES];
-        ctc_status_t status = ctc_encoder_generate_block(
+
+        status = ctc_encoder_generate_block(
             mixed_input,
             round_index,
             block_index,
             block
         );
-
         if (status != CTC_STATUS_OK) {
             return status;
         }
@@ -137,20 +145,20 @@ ctc_status_t ctc_encoder_generate_factors(
             if (status != CTC_STATUS_OK) {
                 return status;
             }
-            if (candidate_result != CTC_ENCODER_CANDIDATE_ACCEPTED) {
-                continue;
+            if (candidate_result == CTC_ENCODER_CANDIDATE_ACCEPTED) {
+                generated_factors[generated++] = candidate;
             }
-
-            factors_out[generated] = candidate;
-            ++generated;
         }
-
-        if (generated_block_count_out != NULL) {
-            *generated_block_count_out = (size_t)block_index + 1U;
-        }
+        generated_block_count = (size_t)block_index + 1U;
     }
 
-    return generated == CTC_FACTORS_PER_BRANCH
-        ? CTC_STATUS_OK
-        : CTC_STATUS_REJECTION_LIMIT;
+    if (generated != CTC_FACTORS_PER_BRANCH) {
+        return CTC_STATUS_REJECTION_LIMIT;
+    }
+
+    memcpy(factors_out, generated_factors, sizeof(generated_factors));
+    if (generated_block_count_out != NULL) {
+        *generated_block_count_out = generated_block_count;
+    }
+    return CTC_STATUS_OK;
 }

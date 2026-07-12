@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import ctypes
 
-from ctc_bindings import CTC_STATUS_OK, lib
+from ctc_bindings import CTC_RATE_BYTES, CTC_STATUS_OK, lib
 
 
 def encode(message: bytes, domain: int = 1) -> bytes:
@@ -24,10 +24,10 @@ def encode(message: bytes, domain: int = 1) -> bytes:
 
 
 def test_message_encoding_and_padding_for_boundary_lengths():
-    for length in [0, 1, 39, 40, 41, 80, 1024]:
+    for length in [0, 1, 34, 35, 36, 70, 1024]:
         message = bytes((index * 17) % 256 for index in range(length))
         encoded = encode(message)
-        assert len(encoded) % 40 == 0
+        assert len(encoded) % CTC_RATE_BYTES == 0
         assert encoded[:length] == message
         assert encoded[length : length + 8] == length.to_bytes(8, "little")
         assert encoded[length + 8] == 0x01

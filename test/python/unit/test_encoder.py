@@ -45,7 +45,7 @@ def test_encoder_is_deterministic_and_respects_factor_ranges():
     assert first == second
     status, factors, block_count = first
     assert status == CTC_STATUS_OK
-    assert block_count >= 4
+    assert block_count >= 3
     assert len(factors) == CTC_FACTORS_PER_BRANCH
     assert all(1 <= index <= 40319 for index, _ in factors)
     assert all(sign in (-1, 1) for _, sign in factors)
@@ -58,7 +58,7 @@ def test_encoder_block_generation_supports_input_output_aliasing():
     assert list(state) == separate
 
 
-def test_v01_input_counter_alias_is_not_present_in_v02():
+def test_v01_input_counter_alias_is_not_present_in_v03():
     rng = random.Random(0xC7C502)
 
     # The old construction satisfied this equality for every x. Testing every

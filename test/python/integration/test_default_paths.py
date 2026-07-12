@@ -37,7 +37,7 @@ def test_hash_and_xof_are_domain_separated():
 @pytest.mark.slow
 def test_block_boundary_lengths():
     seen = set()
-    for length in (0, 1, 39, 40, 41):
+    for length in (0, 1, 34, 35, 36):
         message = bytes(index % 256 for index in range(length))
         digest = hash256(message)
         assert digest not in seen

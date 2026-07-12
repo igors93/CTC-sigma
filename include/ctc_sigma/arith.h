@@ -45,7 +45,7 @@ ctc_status_t ctc_arith_inverse(
 );
 
 /*
- * Apply the CTC-Sigma v0.2 tweakable encoder permutation A_ENC_{i,h}.
+ * Apply the CTC-Sigma v0.3 tweakable encoder permutation A_ENC_{i,h}.
  * The block index selects the constant family and is never injected into the
  * state. subround_count may be used for trace tests but cannot exceed the
  * four normative encoder subrounds.

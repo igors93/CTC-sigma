@@ -25,6 +25,7 @@ static const char *ctc_domain_iv_label(ctc_domain_t domain) {
 }
 
 ctc_status_t ctc_sponge_initialize(ctc_sponge_t *sponge, ctc_domain_t domain) {
+    ctc_sponge_t initialized;
     const char *label;
 
     if (sponge == NULL) {
@@ -35,19 +36,24 @@ ctc_status_t ctc_sponge_initialize(ctc_sponge_t *sponge, ctc_domain_t domain) {
         return CTC_STATUS_OUT_OF_RANGE;
     }
 
-    memset(sponge, 0, sizeof(*sponge));
-    sponge->domain = domain;
-    for (uint32_t lane = 0U; lane < CTC_BRANCH_LANES; ++lane) {
-        ctc_status_t status = ctc_constant_derive(
+    memset(&initialized, 0, sizeof(initialized));
+    initialized.domain = domain;
+    for (uint32_t lane = 0U; lane < CTC_CAPACITY_LANES; ++lane) {
+        ctc_status_t status = ctc_v03_constant_derive(
             label,
+            CTC_V03_CONSTANT_SPONGE_IV,
+            0U,
             0U,
             lane,
-            &sponge->state[CTC_RATE_LANES + lane]
+            (uint32_t)domain,
+            &initialized.state[CTC_RATE_LANES + lane]
         );
         if (status != CTC_STATUS_OK) {
             return status;
         }
     }
+
+    *sponge = initialized;
     return CTC_STATUS_OK;
 }
 
@@ -74,7 +80,8 @@ ctc_status_t ctc_sponge_encode_message(
     }
 
     base_length = message_length + 8U + 1U + 1U;
-    zero_count = (39U + CTC_RATE_BYTES - (base_length % CTC_RATE_BYTES)) % CTC_RATE_BYTES;
+    zero_count = ((CTC_RATE_BYTES - 1U) + CTC_RATE_BYTES
+        - (base_length % CTC_RATE_BYTES)) % CTC_RATE_BYTES;
     if (base_length > SIZE_MAX - zero_count - 1U) {
         return CTC_STATUS_OUT_OF_RANGE;
     }

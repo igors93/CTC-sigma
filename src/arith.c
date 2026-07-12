@@ -2,12 +2,12 @@
 
 #include <stddef.h>
 #include <stdint.h>
-#include <stdio.h>
 #include <string.h>
 
 #include "ctc_sigma/constants.h"
 #include "ctc_sigma/field.h"
 #include "ctc_sigma/parameters.h"
+#include "ctc_sigma/validation.h"
 
 #if !defined(__SIZEOF_INT128__)
 #error "This initial CTC-Sigma implementation requires unsigned __int128 support."
@@ -40,33 +40,6 @@ typedef struct ctc_encoder_constant_context {
     uint32_t block_index;
 } ctc_encoder_constant_context_t;
 
-static ctc_status_t ctc_make_label(
-    const char *base_label,
-    const char *suffix,
-    char output[96]
-) {
-    int written;
-
-    if (base_label == NULL || suffix == NULL || output == NULL) {
-        return CTC_STATUS_INVALID_ARGUMENT;
-    }
-    written = snprintf(output, 96U, "%s|%s", base_label, suffix);
-    if (written < 0 || written >= 96) {
-        return CTC_STATUS_OUT_OF_RANGE;
-    }
-    return CTC_STATUS_OK;
-}
-
-static uint32_t ctc_primary_index(uint32_t round_index, uint32_t subround_index) {
-    return ((round_index & UINT32_C(0xFFFF)) << 16U)
-        | (subround_index & UINT32_C(0xFFFF));
-}
-
-static uint32_t ctc_secondary_index(uint32_t lane_index, uint32_t purpose_index) {
-    return ((lane_index & UINT32_C(0x00FFFFFF)) << 8U)
-        | (purpose_index & UINT32_C(0xFF));
-}
-
 static ctc_status_t ctc_sbox_constants(
     const char *label,
     uint32_t round_index,
@@ -76,46 +49,42 @@ static ctc_status_t ctc_sbox_constants(
     uint64_t *constant_b,
     uint64_t *constant_c
 ) {
-    char derived_label[96];
     ctc_status_t status;
-    const uint32_t primary = ctc_primary_index(round_index, subround_index);
 
-    status = ctc_make_label(label, "SBOX-A", derived_label);
-    if (status != CTC_STATUS_OK) {
-        return status;
-    }
-    status = ctc_constant_derive(
-        derived_label,
-        primary,
-        ctc_secondary_index(lane_index, 0U),
+    status = ctc_v03_constant_derive(
+        label,
+        CTC_V03_CONSTANT_SBOX_A,
+        round_index,
+        subround_index,
+        lane_index,
+        0U,
         constant_a
     );
     if (status != CTC_STATUS_OK) {
         return status;
     }
-
-    status = ctc_make_label(label, "SBOX-B", derived_label);
-    if (status != CTC_STATUS_OK) {
-        return status;
-    }
-    status = ctc_constant_derive_nonzero(
-        derived_label,
-        primary,
-        ctc_secondary_index(lane_index, 1U),
+    status = ctc_v03_constant_derive(
+        label,
+        CTC_V03_CONSTANT_SBOX_B,
+        round_index,
+        subround_index,
+        lane_index,
+        0U,
         constant_b
     );
     if (status != CTC_STATUS_OK) {
         return status;
     }
-
-    status = ctc_make_label(label, "SBOX-C", derived_label);
-    if (status != CTC_STATUS_OK) {
-        return status;
+    if (*constant_b == 0U) {
+        *constant_b = 1U;
     }
-    return ctc_constant_derive(
-        derived_label,
-        primary,
-        ctc_secondary_index(lane_index, 2U),
+    return ctc_v03_constant_derive(
+        label,
+        CTC_V03_CONSTANT_SBOX_C,
+        round_index,
+        subround_index,
+        lane_index,
+        0U,
         constant_c
     );
 }
@@ -127,16 +96,13 @@ static ctc_status_t ctc_round_constant(
     uint32_t lane_index,
     uint64_t *constant_out
 ) {
-    char derived_label[96];
-    ctc_status_t status = ctc_make_label(label, "ROUND-CONSTANT", derived_label);
-
-    if (status != CTC_STATUS_OK) {
-        return status;
-    }
-    return ctc_constant_derive(
-        derived_label,
-        ctc_primary_index(round_index, subround_index),
-        ctc_secondary_index(lane_index, 0U),
+    return ctc_v03_constant_derive(
+        label,
+        CTC_V03_CONSTANT_ROUND,
+        round_index,
+        subround_index,
+        lane_index,
+        0U,
         constant_out
     );
 }
@@ -353,8 +319,14 @@ ctc_status_t ctc_sbox_apply(
     const uint64_t degree = (subround_index & 1U) == 0U ? 23U : 47U;
     ctc_status_t status;
 
-    if (label == NULL || result_out == NULL || lane_index >= CTC_BRANCH_LANES) {
+    if (label == NULL || result_out == NULL) {
         return CTC_STATUS_INVALID_ARGUMENT;
+    }
+    if (round_index >= CTC_FEISTEL_ROUNDS
+        || subround_index >= CTC_ARITH_MAX_SUBROUNDS
+        || lane_index >= CTC_BRANCH_LANES
+        || value >= CTC_FIELD_MODULUS) {
+        return CTC_STATUS_OUT_OF_RANGE;
     }
 
     status = ctc_sbox_constants(
@@ -386,8 +358,14 @@ ctc_status_t ctc_sbox_inverse(
     const uint64_t degree = (subround_index & 1U) == 0U ? 23U : 47U;
     ctc_status_t status;
 
-    if (label == NULL || result_out == NULL || lane_index >= CTC_BRANCH_LANES) {
+    if (label == NULL || result_out == NULL) {
         return CTC_STATUS_INVALID_ARGUMENT;
+    }
+    if (round_index >= CTC_FEISTEL_ROUNDS
+        || subround_index >= CTC_ARITH_MAX_SUBROUNDS
+        || lane_index >= CTC_BRANCH_LANES
+        || value >= CTC_FIELD_MODULUS) {
+        return CTC_STATUS_OUT_OF_RANGE;
     }
 
     status = ctc_sbox_constants(
@@ -599,16 +577,32 @@ ctc_status_t ctc_arith_apply(
     uint32_t subround_count
 ) {
     const ctc_standard_constant_context_t context = {label, round_index};
+    uint64_t working[CTC_BRANCH_LANES];
+    ctc_status_t status;
 
     if (label == NULL || state == NULL) {
         return CTC_STATUS_INVALID_ARGUMENT;
     }
-    return ctc_arith_apply_with_provider(
-        state,
+    if (round_index >= CTC_FEISTEL_ROUNDS
+        || subround_count > CTC_ARITH_MAX_SUBROUNDS) {
+        return CTC_STATUS_OUT_OF_RANGE;
+    }
+    status = ctc_validate_canonical_lanes(state, CTC_BRANCH_LANES);
+    if (status != CTC_STATUS_OK) {
+        return status;
+    }
+
+    memcpy(working, state, sizeof(working));
+    status = ctc_arith_apply_with_provider(
+        working,
         subround_count,
         ctc_standard_constant_provider,
         &context
     );
+    if (status == CTC_STATUS_OK) {
+        memcpy(state, working, sizeof(working));
+    }
+    return status;
 }
 
 ctc_status_t ctc_arith_inverse(
@@ -618,16 +612,32 @@ ctc_status_t ctc_arith_inverse(
     uint32_t subround_count
 ) {
     const ctc_standard_constant_context_t context = {label, round_index};
+    uint64_t working[CTC_BRANCH_LANES];
+    ctc_status_t status;
 
     if (label == NULL || state == NULL) {
         return CTC_STATUS_INVALID_ARGUMENT;
     }
-    return ctc_arith_inverse_with_provider(
-        state,
+    if (round_index >= CTC_FEISTEL_ROUNDS
+        || subround_count > CTC_ARITH_MAX_SUBROUNDS) {
+        return CTC_STATUS_OUT_OF_RANGE;
+    }
+    status = ctc_validate_canonical_lanes(state, CTC_BRANCH_LANES);
+    if (status != CTC_STATUS_OK) {
+        return status;
+    }
+
+    memcpy(working, state, sizeof(working));
+    status = ctc_arith_inverse_with_provider(
+        working,
         subround_count,
         ctc_standard_constant_provider,
         &context
     );
+    if (status == CTC_STATUS_OK) {
+        memcpy(state, working, sizeof(working));
+    }
+    return status;
 }
 
 ctc_status_t ctc_arith_apply_encoder(
@@ -637,6 +647,8 @@ ctc_status_t ctc_arith_apply_encoder(
     uint32_t subround_count
 ) {
     const ctc_encoder_constant_context_t context = {round_index, block_index};
+    uint64_t working[CTC_BRANCH_LANES];
+    ctc_status_t status;
 
     if (state == NULL) {
         return CTC_STATUS_INVALID_ARGUMENT;
@@ -646,12 +658,22 @@ ctc_status_t ctc_arith_apply_encoder(
         || subround_count > CTC_ARITH_ENCODER_SUBROUNDS) {
         return CTC_STATUS_OUT_OF_RANGE;
     }
-    return ctc_arith_apply_with_provider(
-        state,
+    status = ctc_validate_canonical_lanes(state, CTC_BRANCH_LANES);
+    if (status != CTC_STATUS_OK) {
+        return status;
+    }
+
+    memcpy(working, state, sizeof(working));
+    status = ctc_arith_apply_with_provider(
+        working,
         subround_count,
         ctc_encoder_constant_provider,
         &context
     );
+    if (status == CTC_STATUS_OK) {
+        memcpy(state, working, sizeof(working));
+    }
+    return status;
 }
 
 ctc_status_t ctc_arith_inverse_encoder(
@@ -661,6 +683,8 @@ ctc_status_t ctc_arith_inverse_encoder(
     uint32_t subround_count
 ) {
     const ctc_encoder_constant_context_t context = {round_index, block_index};
+    uint64_t working[CTC_BRANCH_LANES];
+    ctc_status_t status;
 
     if (state == NULL) {
         return CTC_STATUS_INVALID_ARGUMENT;
@@ -670,10 +694,20 @@ ctc_status_t ctc_arith_inverse_encoder(
         || subround_count > CTC_ARITH_ENCODER_SUBROUNDS) {
         return CTC_STATUS_OUT_OF_RANGE;
     }
-    return ctc_arith_inverse_with_provider(
-        state,
+    status = ctc_validate_canonical_lanes(state, CTC_BRANCH_LANES);
+    if (status != CTC_STATUS_OK) {
+        return status;
+    }
+
+    memcpy(working, state, sizeof(working));
+    status = ctc_arith_inverse_with_provider(
+        working,
         subround_count,
         ctc_encoder_constant_provider,
         &context
     );
+    if (status == CTC_STATUS_OK) {
+        memcpy(state, working, sizeof(working));
+    }
+    return status;
 }
